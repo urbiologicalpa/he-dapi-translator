@@ -24,6 +24,9 @@ Try the trained model **in your browser** — no install, inference runs client-
 
 ## 📦 Install / Python API
 
+> ⚠️ **Alpha / building:** the pip packages ship the `he2dapi` direction only;
+> `dapi2he` lands with the unpaired model. APIs may change. Not for clinical use.
+
 ```bash
 pip install he-dapi            # inference library + CLI
 pip install napari-he-dapi     # napari plugin (in-viewer translation)

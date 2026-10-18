@@ -1,5 +1,11 @@
 # he-dapi
 
+![status](https://img.shields.io/badge/status-alpha%2Fbuilding-orange) ![PyPI](https://img.shields.io/pypi/v/he-dapi)
+
+> 🚧 **Early / work-in-progress (alpha).** Only the `he2dapi` direction is available today;
+> `dapi2he` (unpaired CycleGAN) is pending training. APIs, weights and outputs may change
+> between releases. **Research demo only — not for clinical use.**
+
 **H&E ↔ DAPI virtual staining — inference library + CLI.**
 
 Predicts a virtual **DAPI** fluorescence image from a brightfield **H&E** patch

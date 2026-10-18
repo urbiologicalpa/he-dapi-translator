@@ -1,5 +1,11 @@
 # napari-he-dapi
 
+![status](https://img.shields.io/badge/status-alpha%2Fbuilding-orange) ![PyPI](https://img.shields.io/pypi/v/napari-he-dapi)
+
+> 🚧 **Early / work-in-progress (alpha).** Only the `he2dapi` direction is wired up today;
+> `dapi2he` (unpaired CycleGAN) lands when training completes. APIs may change.
+> **Research demo only — not for clinical use.**
+
 A [napari](https://napari.org) plugin for **H&E ↔ DAPI virtual staining**, powered by
 [`he-dapi`](https://pypi.org/project/he-dapi/).
 

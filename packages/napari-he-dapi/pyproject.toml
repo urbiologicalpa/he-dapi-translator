@@ -4,14 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "napari-he-dapi"
-version = "0.1.0"
-description = "napari plugin: H&E <-> DAPI virtual staining (runs the he-dapi model in the viewer)"
+version = "0.1.1"
+description = "napari plugin: H&E <-> DAPI virtual staining (runs the he-dapi model in the viewer) — early/alpha"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "urbiologicalpa" }]
 keywords = ["napari", "napari-plugin", "histopathology", "virtual-staining", "dapi", "he"]
 classifiers = [
+  "Development Status :: 3 - Alpha",
   "License :: OSI Approved :: MIT License",
   "Framework :: napari",
   "Programming Language :: Python :: 3",
