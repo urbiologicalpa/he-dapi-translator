@@ -1,6 +1,19 @@
 # MEMORY - H&E <-> DAPI Session Checkpoint 2026-09-27
 
-> Updated 2026-10-18 15:05 UTC: 🟢 RUNNING PID1081 epoch182/200 (~91%). **ALL SHIPPED**: GitHub **Release v0.1.0** + prod promote (GHCR `:v0.1.0`+`:latest`); **HF model repo + FREE Static Space (in-browser ONNX) demo**; GitHub Pages; **PyPI packages `he-dapi` + `napari-he-dapi` v0.1.0** (`pip install he-dapi`); package + dummy-training tests in CI. Fixed cd-production (tag-push-only trigger + pinned checkout). ~17 left → ~Oct-20, pace ~2.4h/ep, best ep169 1.5302. KAGGLE OFF. Tokens: `~/.github_pat`, `~/.hf_token`, `~/.pypi_token` (all 600).
+> Updated 2026-10-18 15:25 UTC: 🟢 RUNNING PID1081 epoch183/200 (~91%). **ALL SHIPPED**: GitHub **Release v0.1.0** + prod promote (GHCR `:v0.1.0`+`:latest`); **HF model repo + FREE Static Space (in-browser ONNX) demo**; GitHub Pages; **PyPI packages `he-dapi` + `napari-he-dapi` v0.1.1 (alpha)** (`pip install he-dapi`); package + dummy-training tests in CI. Fixed cd-production (tag-push-only trigger + pinned checkout). ~17 left → ~Oct-20, pace ~2.4h/ep, best ep169 1.5302. KAGGLE OFF. Tokens: `~/.github_pat`, `~/.hf_token`, `~/.pypi_token` (all 600).
+
+## Session log — 2026-10-18 (deliverables shipped)
+
+Condensed story of the day. Machine-readable: `docs/progress.json:daily_log`; human tracker with a "Shipped 2026-10-18" table: `docs/TRACKER.md`; changelog: `CHANGELOG.md` ([v0.1.1]).
+
+- **Training** unaffected all day: `PID1081` (epoch 182→183/200), reboot-proof via cron `logs/boot_launch.sh`; Kaggle STAND DOWN.
+- **Release/CD:** fixed `cd-production` (release-event checkout bug → tag-push-only trigger + pinned `ref`); promoted **v0.1.0** → GHCR `:v0.1.0` + `:latest`.
+- **Hugging Face:** model repo (weights) + **free Static Space** in-browser ONNX demo (Gradio Spaces now need PRO).
+- **GitHub Pages:** landing live.
+- **PyPI:** `he-dapi` + `napari-he-dapi` **v0.1.1 (alpha)** — inference library+CLI and npe2 napari plugin; token at `~/.pypi_token`.
+- **Tests/CI:** new `packages` CI job; `training-smoke.yml` (manual/weekly); dummy smoke for paired & unpaired (`tests/test_training_dummy.py`).
+- **Docs:** `DEPLOYMENT_GUIDE.md`, `PUBLISHING.md`, `LAUNCH_CHECKLIST.md`, `AGENTS.md` (manual prod approval rule).
+- **Next:** ~17 epochs → ep200 (~Oct-20) → v1.0 (backend + frontend) → single launch; unpaired CycleGAN decision at ep200.
 
 ## Current Status (Updated 2026-10-03 14:43 UTC — syncs with `docs/progress.json:runs` + `docs/TRACKER.md:Live Runs`)
 

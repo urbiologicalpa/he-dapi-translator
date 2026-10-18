@@ -7,28 +7,41 @@
 - Verify guards: `PYTHONPATH=. .venv/bin/python tests/test_resource_guards.py` (11 passed 2026-09-19)
 - Tracker JSON: `docs/progress.json` (machine-readable, auto-updated by `src/utils/progress_tracker.py:1`)
 
-## Overall Progress: 45% (Phase 1 done, Phase 2 local 180/200 90% RUNNING WEEK-MODE + Kaggle OFF)
+## Overall Progress: 45% (Phase 1 done, Phase 2 local 182/200 91% RUNNING WEEK-MODE + Kaggle OFF; product surfaces shipped — GHCR release, HF demo, PyPI packages)
 
-> **Single truth (2026-10-18 10:02 UTC)**: machine-readable `docs/progress.json:runs` + this section + `MEMORY.md` banner are kept in sync. Tracker 45% (Phase 2 at 90%). Local checkpoint files are ground truth for epoch count. Token lives ONLY at `~/.kaggle/api_token` (chmod 600), never in repo.
+> **Single truth (2026-10-18 15:25 UTC)**: machine-readable `docs/progress.json:runs` + this section + `MEMORY.md` banner are kept in sync. Tracker 45% (Phase 2 at 91%). Local checkpoint files are ground truth for epoch count. Tokens live ONLY in `$HOME` dotfiles (`~/.github_pat`, `~/.hf_token`, `~/.pypi_token`, `~/.kaggle/api_token`), never in repo.
 
 ## Live Runs (canonical — update here + `progress.json:runs` + `MEMORY.md` together)
 
 | Run | Status | Detail |
 |-----|--------|--------|
-| Local CPU | 🟢 RUNNING WEEK-MODE (1-week plan) | `PID1081` epoch181/200 (`180/200 90%`, **best ep169 1.5302 NEW BEST-EVER**; 178 1.5878 / 179 1.5906 / 180 1.5869 sideways-easing) `nice10 -u -m --resume auto --optimize-for lowram`, ~2.4h/ep steady. Watch1096 + keepalive1099 300s. RAM 58%, uptime 1d5h stable. No loss since 05:00 reboot. 20 left → finish ~Oct-20. Unpaired CycleGAN 200 kept in plan, decide at ep200. |
+| Local CPU | 🟢 RUNNING WEEK-MODE (1-week plan) | `PID1081` epoch183/200 (`182/200 91%`, **best ep169 1.5302**; 180 1.5869 / 181 1.5874 / 182 1.5929 sideways-easing) `nice10 -u -m --resume auto --optimize-for lowram`, ~2.4h/ep steady. Watch1096 + keepalive1099 300s, reboot-proof via cron. RAM ~60%, uptime 1d10h stable. 18 left → finish ~Oct-20. Unpaired CycleGAN 200 kept in plan, decide at ep200. |
 | Kaggle | ⬜ CANCELLED, STAND DOWN | stays OFF until GPU quota refreshes |
-| Epoch ground truth | 168/200 done (84%) | `checkpoint_epoch168.pt` + `checkpoint_last.pt` Oct-17 03:19 (internal epoch 167); loss 1.5934. Reboot 04:52 killed `PID952` mid-epoch169 (~0.6h redone). |
+| Epoch ground truth | 182/200 done (91%) | `checkpoint_epoch182.pt` + `checkpoint_last.pt`; best val ep169 1.5302; ~18 left → ~Oct-20 |
 | ⚠️ Gap (kept) | No validation runs | `val_every: 5` unused in `train_paired.py` — loss-only; SSIM/PSNR/Dice Phase 4 TODO |
 | Reboot-proofing (new) | cron `@reboot` + `*/5` → `logs/boot_launch.sh` | Idempotent flock-guarded supervisor relaunches keepalive→train+watch if dead; no sudo/linger. Supersedes manual reboot relaunch. |
+
+## Shipped 2026-10-18 — product surfaces (all live)
+
+| Surface | What | Link / artifact |
+|---------|------|-----------------|
+| Release | **v0.1.0** promoted (GHCR `:v0.1.0` + `:latest`, same SHA as `:staging`) | https://github.com/urbiologicalpa/he-dapi-translator/releases/tag/v0.1.0 |
+| CI/CD fix | `cd-production` now tag-push-only trigger + pinned checkout (release-event `fetch-tags` broke checkout); `publish-pypi.yml` added | `.github/workflows/` |
+| Hugging Face | model repo (weights) + **free Static Space** in-browser ONNX demo (Gradio Spaces need PRO) | https://huggingface.co/urbiologicalpa/he-dapi-translator · https://huggingface.co/spaces/urbiologicalpa/he-dapi-translator |
+| GitHub Pages | landing page live | https://urbiologicalpa.github.io/he-dapi-translator/ |
+| PyPI | `he-dapi` + `napari-he-dapi` **v0.1.1, alpha** (Development Status 3 - Alpha) | https://pypi.org/project/he-dapi/ · https://pypi.org/project/napari-he-dapi/ |
+| Tests | package tests + paired/unpaired dummy smoke (CI `packages` job; `training-smoke.yml` manual/weekly) | `packages/*/tests`, `tests/test_training_dummy.py` |
+| Docs | deployment, publishing, launch checklist, AGENTS rules | `docs/DEPLOYMENT_GUIDE.md`, `docs/PUBLISHING.md`, `docs/LAUNCH_CHECKLIST.md`, `AGENTS.md` |
+| Contributor | 5 `good first issue` (#6–#10) + `help wanted` (#1/#3) | GitHub Issues |
 
 | Phase | Name | Status | % | Artifacts | Optimization enforced |
 |-------|------|--------|---|-----------|----------------------|
 | 0 | Scoping & Infra (W1-2) | ✅ DONE | 100 | `docs/WORKPLAN.md:14`, `pyproject.toml:1`, `README.md:1`, `wiki/01-machine-profile/` | `pyproject.toml:31` fix `openseadragon` break, `src/utils/__init__.py:1` lazy imports |
 | 1 | Data (W2-4) | ✅ DONE | 100 | `data/processed/hemit_train_512.h5` 3717, `hemit_val/test`, `mhist_*.h5`, `pack_hemit.py:1` | streaming B=100 peak 140MB vs 10.6GB, SWMR, gc `wiki/02-data-extraction/SKILL.md:1` |
 | 2 | Modeling (W4-8) Dual Track | 🟡 IN_PROGRESS | 40 | `configs/hemit_dual_branch.yaml:35`, `bikasash/hemit-he-dapi-product-full` 7.7G, `bikasash/he-dapi-product-gpu-train` T4 `src/models/train_paired.py:61` epoch10/200 | **batch 2+accum4, num_workers 0, dists_off, OOM catch** `wiki/06-training/SKILL.md:1` product FULL no compromise |
-| 3 | Drag & Drop Tool (W8-10) | ⬜ TODO | 0 | `src/backend/main.py:40`, `src/models/infer.py:17` | 429 guard, thumbnail before numpy, streaming TIFF `wiki/07-inference/` |
+| 3 | Drag & Drop Tool (W8-10) | 🟡 IN_PROGRESS | 45 | `src/backend/main.py:40`, `packages/he-dapi`, `packages/napari-he-dapi`, `src/frontend/README.md` | backend + pip library + napari plugin done; React frontend + WSI queue TODO |
 | 4 | Validation (W10-11) | ⬜ TODO | 0 | — | MC dropout variance map must use streaming (no 5× RAM) |
-| 5 | Docker & Deploy (W11-12) | ⬜ TODO | 0 | `docker/Dockerfile` | multi-stage slim, no GPU runtime on this box |
+| 5 | Docker & Deploy (W11-12) | 🟡 IN_PROGRESS | 65 | `docker/Dockerfile`, `.github/workflows/cd-*.yml`, `ghcr.io/urbiologicalpa/he-dapi-translator` | CI→staging→prod promote live; PyPI + HF Space done; Docker Hub mirror + compose pending |
 
 ## Phase Progress Detail
 
