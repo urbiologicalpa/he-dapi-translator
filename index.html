@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H&E ↔ DAPI Virtual Staining Translator</title>
+<meta name="description" content="Bi-directional H&E↔DAPI virtual staining for histopathology, trained on a 3.7GB CPU-only laptop.">
+<style>
+  :root{--bg:#0d1117;--fg:#e6edf3;--muted:#9da7b3;--card:#161b22;--accent:#e5698b;--accent2:#58a6ff;--border:#30363d}
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg)}
+  a{color:var(--accent2)}
+  header{padding:64px 20px 32px;text-align:center;background:radial-gradient(1000px 400px at 50% -50px,#1f2a44,transparent)}
+  h1{margin:0 0 8px;font-size:clamp(28px,5vw,48px)}
+  .tag{color:var(--muted);max-width:720px;margin:0 auto}
+  .wrap{max-width:960px;margin:0 auto;padding:0 20px 64px}
+  .badges{margin:20px 0;display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+  .badges img{height:20px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin:32px 0}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+  .card h3{margin:0 0 6px;font-size:16px}
+  .card p{margin:0;color:var(--muted);font-size:14px}
+  .imgs{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:32px 0}
+  .imgs figure{margin:0}
+  .imgs img{width:100%;border-radius:12px;border:1px solid var(--border);background:#000}
+  figcaption{text-align:center;color:var(--muted);font-size:13px;margin-top:8px}
+  .cta{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin:32px 0}
+  .btn{display:inline-block;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;border:1px solid var(--border)}
+  .btn.primary{background:var(--accent);color:#fff;border-color:transparent}
+  .btn.ghost{background:transparent;color:var(--fg)}
+  code{background:#1f2630;padding:2px 6px;border-radius:6px;font-size:13px}
+  .bar{height:10px;background:#21262d;border-radius:999px;overflow:hidden;margin:10px 0 4px}
+  .bar>i{display:block;height:100%;width:90.5%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  footer{text-align:center;color:var(--muted);font-size:13px;padding:24px}
+</style>
+</head>
+<body>
+<header>
+  <h1>H&E ↔ DAPI Virtual Staining Translator</h1>
+  <p class="tag">Bi-directional virtual staining for histopathology — patches and whole-slide images.
+  Product-grade Pix2Pix + CycleGAN, trained on a <b>3.7GB CPU-only laptop</b>.</p>
+  <div class="badges">
+    <a href="https://github.com/urbiologicalpa/he-dapi-translator/actions"><img alt="guards" src="https://github.com/urbiologicalpa/he-dapi-translator/actions/workflows/ci.yml/badge.svg"></a>
+    <img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-2.14%20CPU-orange">
+    <img alt="license" src="https://img.shields.io/badge/license-MIT-blue">
+    <img alt="trained on" src="https://img.shields.io/badge/trained%20on-3.7GB%20CPU-critical">
+  </div>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/urbiologicalpa/he-dapi-translator">GitHub repo</a>
+    <a class="btn ghost" href="https://github.com/urbiologicalpa/he-dapi-translator/blob/main/docs/TRACKER.md">Live training log</a>
+    <a class="btn ghost" href="https://github.com/urbiologicalpa/he-dapi-translator/releases">Releases</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="card">
+    <h3>Training progress — 181 / 200 epochs (90.5%)</h3>
+    <div class="bar"><i></i></div>
+    <p>G-loss 2.2603 → <b>1.5302</b> (−32%), D-loss ~0.75 stable, no divergence. Per-epoch atomic checkpoints, crash-resume safe.</p>
+  </div>
+
+  <div class="imgs">
+    <figure><img src="https://raw.githubusercontent.com/urbiologicalpa/he-dapi-translator/main/data/examples/he_example.png" alt="H&E input"><figcaption>H&E input (RGB)</figcaption></figure>
+    <figure><img src="https://raw.githubusercontent.com/urbiologicalpa/he-dapi-translator/main/data/examples/dapi_example.png" alt="DAPI target"><figcaption>DAPI target (grayscale)</figcaption></figure>
+  </div>
+
+  <div class="grid">
+    <div class="card"><h3>🔬 Two directions</h3><p>H&E→DAPI (paired Pix2Pix: CNN-ResNet + Swin + FMF fusion + PatchGAN) and DAPI→H&E (CycleGAN) for unaligned sections.</p></div>
+    <div class="card"><h3>🧩 Streaming WSI</h3><p>Per-tile whole-slide translation with no full-slide canvas (4.8GB → 512MB budget) and ONNX export.</p></div>
+    <div class="card"><h3>💻 Built on 3.7GB, no GPU</h3><p>Streaming-by-default engineering, resource monitors, and 11 low-RAM regression guards mirrored in CI.</p></div>
+    <div class="card"><h3>🚀 Deployable</h3><p>FastAPI backend + drag-and-drop UI, Dockerized; staging image on GHCR.</p></div>
+  </div>
+
+  <h2>Quick start</h2>
+  <pre style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;overflow:auto"><code># CPU env
+uv pip install --python .venv/bin/python torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# inference (patch + streaming WSI)
+PYTHONPATH=. .venv/bin/python src/models/infer.py --input data/examples/he_example.png --direction he2dapi --out /tmp/synth.png
+
+# train (resumable, safe to kill/rerun)
+PYTHONPATH=. .venv/bin/python -m src.models.train_paired --config configs/hemit_dual_branch.yaml --resume auto --optimize-for lowram</code></pre>
+
+  <div class="cta">
+    <a class="btn ghost" href="https://github.com/urbiologicalpa/he-dapi-translator/blob/main/CONTRIBUTING.md">Contribute</a>
+    <a class="btn ghost" href="https://github.com/urbiologicalpa/he-dapi-translator/discussions">Discussions</a>
+    <a class="btn ghost" href="https://github.com/urbiologicalpa/he-dapi-translator/issues">Issues</a>
+  </div>
+</main>
+
+<footer>Built in public by <a href="https://github.com/urbiologicalpa">@urbiologicalpa</a> · MIT</footer>
+</body>
+</html>
