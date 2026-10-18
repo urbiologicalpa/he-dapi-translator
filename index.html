@@ -3,8 +3,45 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>H&E ↔ DAPI Virtual Staining Translator</title>
-<meta name="description" content="Bi-directional H&E↔DAPI virtual staining for histopathology, trained on a 3.7GB CPU-only laptop.">
+<title>H&E ↔ DAPI Virtual Staining Translator | he-dapi-translator</title>
+<meta name="description" content="Bi-directional H&E↔DAPI virtual staining for histopathology — Pix2Pix + CycleGAN for patches and whole-slide images, trained on a 3.7GB CPU-only laptop. Open source (PyTorch, MIT).">
+<link rel="canonical" href="https://urbiologicalpa.github.io/he-dapi-translator/">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0d1117">
+<meta name="keywords" content="H&E, DAPI, virtual staining, histopathology, digital pathology, Pix2Pix, CycleGAN, whole-slide image, WSI, PyTorch, image-to-image translation, fluorescence microscopy">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="H&E ↔ DAPI Virtual Staining Translator">
+<meta property="og:title" content="H&E ↔ DAPI Virtual Staining Translator">
+<meta property="og:description" content="Open-source bi-directional H&E↔DAPI virtual staining — Pix2Pix + CycleGAN, streaming whole-slide support, trained on a 3.7GB CPU-only laptop.">
+<meta property="og:url" content="https://urbiologicalpa.github.io/he-dapi-translator/">
+<meta property="og:image" content="https://raw.githubusercontent.com/urbiologicalpa/he-dapi-translator/main/data/examples/dapi_example.png">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="H&E ↔ DAPI Virtual Staining Translator">
+<meta name="twitter:description" content="Open-source bi-directional H&E↔DAPI virtual staining — Pix2Pix + CycleGAN, streaming WSI, trained on a 3.7GB CPU-only laptop.">
+<meta name="twitter:image" content="https://raw.githubusercontent.com/urbiologicalpa/he-dapi-translator/main/data/examples/dapi_example.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareSourceCode",
+  "name": "he-dapi-translator — H&E ↔ DAPI Virtual Staining Translator",
+  "alternateName": "he-dapi",
+  "description": "Bi-directional H&E↔DAPI virtual staining for histopathology: paired Pix2Pix (H&E→DAPI) and unpaired CycleGAN (DAPI→H&E), streaming whole-slide support, ONNX export.",
+  "url": "https://urbiologicalpa.github.io/he-dapi-translator/",
+  "codeRepository": "https://github.com/urbiologicalpa/he-dapi-translator",
+  "programmingLanguage": "Python",
+  "runtimePlatform": "PyTorch",
+  "license": "https://opensource.org/licenses/MIT",
+  "applicationCategory": "Machine Learning",
+  "operatingSystem": "Linux, macOS, Windows",
+  "keywords": "H&E, DAPI, virtual staining, histopathology, digital pathology, Pix2Pix, CycleGAN, whole-slide image, WSI, PyTorch",
+  "author": {"@type": "Person", "name": "urbiologicalpa", "url": "https://github.com/urbiologicalpa"},
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}
+}
+</script>
+
 <style>
   :root{--bg:#0d1117;--fg:#e6edf3;--muted:#9da7b3;--card:#161b22;--accent:#e5698b;--accent2:#58a6ff;--border:#30363d}
   *{box-sizing:border-box}
@@ -30,7 +67,7 @@
   .btn.ghost{background:transparent;color:var(--fg)}
   code{background:#1f2630;padding:2px 6px;border-radius:6px;font-size:13px}
   .bar{height:10px;background:#21262d;border-radius:999px;overflow:hidden;margin:10px 0 4px}
-  .bar>i{display:block;height:100%;width:90.5%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .bar>i{display:block;height:100%;width:91.5%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
   footer{text-align:center;color:var(--muted);font-size:13px;padding:24px}
 </style>
 </head>
@@ -54,7 +91,7 @@
 
 <main class="wrap">
   <div class="card">
-    <h3>Training progress — 181 / 200 epochs (90.5%)</h3>
+    <h3>Training progress — 183 / 200 epochs (91.5%)</h3>
     <div class="bar"><i></i></div>
     <p>G-loss 2.2603 → <b>1.5302</b> (−32%), D-loss ~0.75 stable, no divergence. Per-epoch atomic checkpoints, crash-resume safe.</p>
   </div>
