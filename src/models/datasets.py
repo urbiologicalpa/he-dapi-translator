@@ -83,7 +83,9 @@ class PairedHEMITDataset(Dataset):
                 self.n = len(self._files)
         else:
             print(f"[WARN] Paired dataset not found: h5={h5_path}, root={root_dir}. Using synthetic dummy.")
-            self.n = 8
+            # Honor a requested subset (e.g. --dummy indices=range(4)); __getitem__
+            # maps through self.indices, so __len__ must match its size.
+            self.n = len(indices) if indices is not None else 8
             self._h5_path = None
             self._files = []
 

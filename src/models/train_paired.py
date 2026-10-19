@@ -220,6 +220,10 @@ def main():
 
     # Checkpoint dir early for resume detection
     ckpt_dir = Path(train_cfg.get("checkpoint_dir","resources/models/checkpoints/he2dapi"))
+    if args.dummy:
+        # never touch real checkpoints during a smoke test (would clobber live training)
+        import tempfile
+        ckpt_dir = Path(tempfile.mkdtemp(prefix="he_dapi_dummy_paired_"))
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     # Datasets - low-RAM: support subset via data_cfg lowram_subset or dummy

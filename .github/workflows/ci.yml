@@ -34,6 +34,8 @@ jobs:
         run: PYTHONPATH=. python -m src.utils.progress_tracker --enforce
       - name: Resource-guard regression tests
         run: PYTHONPATH=. python -m pytest tests/test_resource_guards.py -v
+      - name: Dataset fallback regression tests
+        run: PYTHONPATH=. python -m pytest tests/test_datasets.py -v
       - name: Backend smoke (import + /health, no model weights needed)
         run: |
           pip install fastapi httpx python-multipart
