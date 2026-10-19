@@ -57,8 +57,11 @@ def save_image(arr: np.ndarray, path: str):
         Image.fromarray(arr).save(path)
     print(f"[SAVE] {path} shape {arr.shape}")
 
-def run_torch_model(tile: np.ndarray, direction: str, checkpoint: str = None) -> np.ndarray:
+def run_torch_model(tile: np.ndarray, direction: str, checkpoint: str = None, dummy: bool = False) -> np.ndarray:
     """Run PyTorch generator on single tile (HWC uint8) -> synthetic HWC uint8. Falls back to dummy invert."""
+    if dummy:
+        return _dummy_transform(tile, direction)
+
     try:
         import torch
         from src.models.train_paired import UNetGenerator
@@ -126,11 +129,32 @@ def run_onnx(tile: np.ndarray, onnx_path: str) -> np.ndarray:
         print(f"[ONNX] failed {e}, fallback to torch")
         return run_torch_model(tile, "he2dapi")
 
-def infer_patch(input_path: str, direction: str, out_path: str, onnx_path: str = None, checkpoint: str = None, tile_size: int = 512, stride: int = 256, stream: bool = False):
+def _dummy_transform(tile: np.ndarray, direction: str) -> np.ndarray:
+    """Lightweight CPU-only transformation for inference smoke tests."""
+    if direction == "he2dapi":
+        if tile.ndim == 3:
+            gray = np.dot(
+                tile[..., :3], [0.2989, 0.5870, 0.1140]
+            )
+        else:
+            gray = tile
+        return (255 - gray).astype(np.uint8)
+
+    gray = tile if tile.ndim == 2 else tile[..., 0]
+    return np.stack(
+        [
+            gray,
+            (gray * 0.6).astype(np.uint8),
+            (gray * 0.8).astype(np.uint8),
+        ],
+        axis=-1,
+    )
+
+def infer_patch(input_path: str, direction: str, out_path: str, onnx_path: str = None, checkpoint: str = None, tile_size: int = 512, stride: int = 256, stream: bool = False, dummy: bool = False, profile_log_path: str = "wiki/07-inference/profile.json"):
     # Resource guard at entry
     try:
         from src.utils.resource_monitor import ResourceMonitor
-        mon = ResourceMonitor(budget_gb=1.5, log_path="wiki/07-inference/profile.json")
+        mon = ResourceMonitor(budget_gb=1.5, log_path=profile_log_path)
         mon.check(f"infer:{direction}:start")
     except: mon=None
     img = load_image(input_path, max_size=2048 if not stream else 4096, stream=stream)
@@ -184,7 +208,7 @@ def infer_patch(input_path: str, direction: str, out_path: str, onnx_path: str =
         if onnx_path and Path(onnx_path).exists():
             result = run_onnx(img, onnx_path)
         else:
-            result = run_torch_model(img, direction, checkpoint)
+            result = run_torch_model(img, direction, checkpoint,dummy=dummy)
         if mon: mon.check(f"infer:{direction}:patch_end")
     # Save only if not already streamed
     if result is not None and not (isinstance(result, np.ndarray) and result.shape[0]==1 and result.shape[1]==1):
@@ -275,7 +299,8 @@ def infer_wsi_streaming(wsi_path: str, direction: str, out_path: str, checkpoint
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--input", type=str, required=True)
+    ap.add_argument("--input", type=str, default=None)
+    ap.add_argument("--dummy", action="store_true", help="run a lightweight inference smoke test")
     ap.add_argument("--direction", type=str, default="he2dapi", choices=["he2dapi","dapi2he"])
     ap.add_argument("--out", type=str, default=None)
     ap.add_argument("--onnx", type=str, default=None)
@@ -285,6 +310,56 @@ def main():
     ap.add_argument("--stride", type=int, default=256)
     ap.add_argument("--stream", action="store_true", help="force streaming mode (low RAM)")
     args = ap.parse_args()
+
+    if args.dummy:
+        if Image is None:
+            ap.error("Pillow is required for the dummy smoke test")
+
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            input_path = Path(temp_dir) / "dummy_input.png"
+            output_path = Path(temp_dir) / "dummy_output.png"
+
+            dummy_input = np.random.randint(
+                0, 256, size=(64, 64, 3), dtype=np.uint8
+            )
+            Image.fromarray(dummy_input).save(input_path)
+
+            output = infer_patch(
+                input_path=str(input_path),
+                direction=args.direction,
+                out_path=str(output_path),
+                checkpoint=None,
+                tile_size=64,
+                stride=64,
+                stream=False,
+                dummy=True,
+                profile_log_path=str(Path(temp_dir) / "profile.json"),
+            )
+
+            assert output is not None, "Inference returned no output"
+            assert output.shape[:2] == (64, 64), (
+                f"Unexpected output shape: {output.shape}"
+            )
+            assert output.dtype == np.uint8, (
+                f"Unexpected output dtype: {output.dtype}"
+            )
+            assert np.isfinite(output).all(), "Output contains non-finite values"
+
+            normalized = output.astype(np.float32) / 255.0
+            assert normalized.min() >= 0.0 and normalized.max() <= 1.0
+            assert output_path.exists(), "Output image was not saved"
+
+            print(
+                f"[SMOKE OK] shape={output.shape}, "
+                f"dtype={normalized.dtype}, "
+                f"range=[{normalized.min():.3f}, {normalized.max():.3f}]"
+            )
+        return
+
+    if not args.input:
+        ap.error("--input is required unless --dummy is used")
     out = args.out or f"/tmp/synthetic_{Path(args.input).stem}_{args.direction}.{'tiff' if args.stream or args.wsi else 'png'}"
     if args.wsi and args.stream:
         # Use true WSI streaming (no full load)
