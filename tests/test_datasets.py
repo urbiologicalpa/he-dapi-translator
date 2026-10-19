@@ -24,8 +24,9 @@ def test_synthetic_fallback_honours_indices(n_indices):
     assert len(ds) == n_indices
     for i in range(len(ds)):
         sample = ds[i]
-        assert sample["he"].shape == (3, 32, 32)
-        assert sample["dapi"].shape == (1, 32, 32)
+        # torch -> CHW (3,32,32) / (1,32,32); no-torch -> numpy HWC (32,32,3) / (32,32)
+        assert set(sample["he"].shape) == {3, 32, 32}
+        assert set(sample["dapi"].shape) in ({1, 32, 32}, {32, 32})
 
 
 def test_synthetic_fallback_without_indices():
@@ -36,4 +37,4 @@ def test_synthetic_fallback_without_indices():
         augment=False,
     )
     assert len(ds) == 8
-    assert ds[7]["he"].shape == (3, 32, 32)
+    assert set(ds[7]["he"].shape) == {3, 32, 32}
