@@ -54,11 +54,11 @@ Condensed story of the day. Machine-readable: `docs/progress.json:daily_log`; hu
 - **Verification**: `.venv/bin/python -m src.utils.resource_monitor --check` → 35% used, 2473MB avail, `Advised batch 4` for 512px
 
 ### Data Extraction — COMPLETE (user asked "we complete daat extraction ri8?" → YES)
-- **HEMIT**: `data/raw/hemit/extracted/{train,val,test}/{input,label}/*.tif` = 5292 pairs (3717/630/945) — extracted from `HEMIT.7z` (44G raw) via `hemit_extract.py:1` → `pack_hemit.py:1` (streaming)
+- **HEMIT**: `data/raw/hemit/extracted/{train,val,test}/{input,label}/*.tif` = 5292 pairs (3717/630/945) — extracted from `HEMIT.7z` (44G raw) via `scripts/data/hemit_extract.py:1` → `scripts/data/pack_hemit.py:1` (streaming)
   - `data/processed/hemit_train_512.h5` 3.7G (3717), `hemit_val_512.h5` 684M (630), `hemit_test_512.h5` 968M (945) — resumable `.tmp` + `os.replace`, flush 500, skip if `he.shape[0]==len(pairs)`
   - `hemit_512.h5` combined 5292 (5.3G) — **previously OOM** via `np.concatenate` (10.6GB peak) → fixed Sep 19 to chunked copy B=100 (peak 140MB, `wiki/02-data-extraction/SKILL.md:1`)
-  - Pipeline: `hemit_extract.py:6` (outer zip → `HEMIT.7z` → py7zr → `extracted`), `pack_hemit.py:86` (now streaming), `resources/datasets/prepare_patches.py:33` (512 central crop, lzf, gc)
-- **BCI HER2** (alternative): `data/raw/bci_her2match/HE|IHC` → `pack_bci.py:1` streaming combined (peak 150MB, was 9GB), `wiki/02-data-extraction/OPTIMIZATION.md:1`
+  - Pipeline: `scripts/data/hemit_extract.py:6` (outer zip → `HEMIT.7z` → py7zr → `extracted`), `scripts/data/pack_hemit.py:86` (now streaming), `resources/datasets/prepare_patches.py:33` (512 central crop, lzf, gc)
+- **BCI HER2** (alternative): `data/raw/bci_her2match/HE|IHC` → `scripts/data/pack_bci.py:1` streaming combined (peak 150MB, was 9GB), `wiki/02-data-extraction/OPTIMIZATION.md:1`
 - **Paired fallback** (08-31): `maxpmx_*.h5` 4192 pairs (3353/419/420) — still valid
 - **Unpaired H&E**: `mhist_256.h5` 498M + `mhist_512.h5` 1.9G (3152), `codex_512.h5`, `monuseg_256.h5`, `data/raw/wsi/CMU-1.svs`
 - **Report**: `docs/DATA_EXTRACTION_REPORT.md:1` (08-31) + `docs/optimization/REPORT.md:1` (09-19) + `wiki/README.md:1`
@@ -68,7 +68,7 @@ Condensed story of the day. Machine-readable: `docs/progress.json:daily_log`; hu
 | # | Wiki Folder | Skill | File Patched | Spike Fixed |
 |---|-------------|-------|--------------|-------------|
 | 1 | `wiki/01-machine-profile/` | machine_profiler | `src/utils/resource_monitor.py:1` | 3.7GB profile + budgets |
-| 2 | `wiki/02-data-extraction/` | extraction_optimizer | `pack_hemit.py:1`, `pack_bci.py:1`, `prepare_patches.py:1` | 10.6GB concat → 140MB streaming |
+| 2 | `wiki/02-data-extraction/` | extraction_optimizer | `scripts/data/pack_hemit.py:1`, `scripts/data/pack_bci.py:1`, `prepare_patches.py:1` | 10.6GB concat → 140MB streaming |
 | 3 | `wiki/03-datasets/` | dataset_streamer | `src/models/datasets.py:26` | SWMR lazy open, mihc fallback, H5 for unpaired |
 | 4 | `wiki/04-tiling/` | tiling_streamer | `src/utils/tiling.py:55` | 4.8GB canvas → memmap streaming `merge_tiles_streaming` |
 | 5 | `wiki/05-wsi-loader/` | wsi_streamer | `src/utils/wsi_loader.py:76` | `asarray()` 4.8GB → `aszarr` zarr slice |
@@ -85,7 +85,7 @@ Condensed story of the day. Machine-readable: `docs/progress.json:daily_log`; hu
 For any long step, make resumable + checkpoint so crash can resume (since machine was crashing abruptly).
 
 1. **Fetch**: `resources/datasets/download_hemit_resumable.sh:1` (curl -C -)
-2. **Prepare**: `prepare_patches.py:33` + `pack_hemit.py:1` streaming + gc + `ResourceMonitor`
+2. **Prepare**: `prepare_patches.py:33` + `scripts/data/pack_hemit.py:1` streaming + gc + `ResourceMonitor`
 3. **Training paired**: `src/models/train_paired.py:98` `--resume auto`, `checkpoint_last.pt` every 1 epoch, now grad_accum + OOM guard + `dists_on_cpu false`
 4. **Training unpaired**: `src/models/train_unpaired.py:90` same, `train_dummy(monitor, batch, grad_accum)`
 5. **Configs**: `configs/hemit_dual_branch.yaml:35` + `cyclegan_dapi2he.yaml:27` lowram defaults
