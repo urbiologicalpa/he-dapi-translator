@@ -1,4 +1,4 @@
-# H&E → DAPI Virtual Staining Translator
+# H&E ↔ DAPI Bidirectional Virtual Staining
 
 [![guards](https://github.com/urbiologicalpa/he-dapi-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/urbiologicalpa/he-dapi-translator/actions)
 [![status](https://img.shields.io/badge/status-alpha-orange)](#status)
@@ -7,9 +7,15 @@
 [![PyPI](https://img.shields.io/pypi/v/he-dapi?label=pip%20install%20he-dapi)](https://pypi.org/project/he-dapi/)
 [![research use only](https://img.shields.io/badge/use-research%20only-critical)](#limitations)
 
-Research software for translating brightfield **H&E** histology into a virtual
-**DAPI** fluorescence image. The longer-term goal is bidirectional translation
-(H&E ↔ DAPI), whole-slide inference, and a deployable CPU/GPU application.
+Product scaffold for a **bidirectional H&E ↔ DAPI virtual staining tool**: one
+plugin/API/UI where a user can drop either modality and request the other, on
+patches or whole-slide images.
+
+**The bidirectional product is not available yet.** Only a one-way forward
+baseline is being trained; the reverse direction is still a skeleton. This repo
+does not claim a working bidirectional model until both directions have trained,
+evaluated weights. The product thesis is the unified workflow, not another
+one-way H&E → DAPI paper reproduction.
 
 > **Important status (2026-10-20).** A channel-order bug in the previous data
 > pipeline trained the current checkpoints on **panCK (ch2)**, not DAPI (ch0).
@@ -22,6 +28,7 @@ Research software for translating brightfield **H&E** histology into a virtual
 ## Contents
 
 - [Status](#status)
+- [Why bidirectional](#why-bidirectional)
 - [What is implemented](#what-is-implemented)
 - [Data](#data)
 - [Quick start](#quick-start)
@@ -38,6 +45,7 @@ Research software for translating brightfield **H&E** histology into a virtual
 
 | Area | State | Notes |
 |---|---|---|
+| Bidirectional plugin / one workflow | **Not available** | UI/API routing scaffold exists; reverse model is untrained, so this is not yet a bidirectional product |
 | H&E → panCK ablation | **Finishing / archive** | Local CPU run, epoch 199 saved, epoch 200 running; used only to validate the pipeline |
 | H&E → DAPI | **Not trained yet** | Data fix is in place; corrected 1024px run is queued |
 | DAPI → H&E | **Not available** | The CycleGAN trainer is a smoke-test skeleton; no real weights |
@@ -56,14 +64,28 @@ Hardware context:
   training on the 3.7 GB box; CPU deployment will use tiled inference and may
   require distillation/quantization.
 
+## Why bidirectional
+
+One-way H&E → DAPI is already published (HEMIT, mSIGHT, and related work). A
+plain forward U-Net is a **baseline**, not the product differentiator. The gap is
+a single tool that accepts either modality, routes to the right model, and
+supports patch + WSI workflows with honest confidence/limitations.
+
+That is the product thesis. The current repo is the first stage of it: fix the
+data, establish a reproducible forward baseline, then train the reverse
+direction, and only then expose both directions as one bidirectional plugin.
+
 ## What is implemented
 
 ### Models and losses
 
-- **Implemented baseline:** a compact U-Net generator (3 → 1) with a PatchGAN
-  discriminator, L1 + SSIM, optional DISTS, and a nuclei-Dice auxiliary loss.
+- **Implemented forward baseline:** a compact U-Net generator (3 → 1) with a
+  PatchGAN discriminator, L1 + SSIM, optional DISTS, and a nuclei-Dice auxiliary
+  loss. This is the one-way baseline, not the bidirectional product.
 - **Implemented reverse trainer skeleton:** a ResNet generator and a
   CycleGAN-style dummy loop. It is not a working DAPI → H&E model yet.
+- **Not implemented:** a unified bidirectional model, direction router, shared
+  encoder/dual decoders, or trained reverse weights.
 - **Planned:** the HEMIT dual-branch generator (CNN-ResNet + Swin-T + feature-map
   fusion) and the full paper training protocol. The config name
   `hemit_dual_branch.yaml` is aspirational; the trainer currently selects the
@@ -82,9 +104,10 @@ Hardware context:
 
 ### Not implemented or not validated
 
+- A unified bidirectional model or direction router.
+- A trained DAPI → H&E direction.
 - Full 1024px DAPI training.
 - HEMIT dual-branch / Swin / FMF.
-- A trained DAPI → H&E direction.
 - Full 630-image validation and held-out test evaluation for DAPI.
 - Clinical or diagnostic validation of any kind.
 
@@ -301,14 +324,19 @@ Generated artifacts are git-ignored:
 - [ ] Run the full 630-image validation and 945-image held-out test evaluation.
 - [ ] Implement/vendor the dual-branch Swin-T + FMF generator.
 - [ ] Train DAPI → H&E (paired if aligned data is available; otherwise unpaired).
+- [ ] Add a direction router so one plugin/API accepts either modality.
 - [ ] Benchmark 512px tiled / INT8 CPU inference against the 3.7 GB target.
-- [ ] Ship corrected weights to PyPI, Hugging Face, and the Docker image.
-- [ ] Publish a model card with intended use, limits, and failure modes.
+- [ ] Ship **bidirectional v1** only after both directions have trained, evaluated
+      weights; until then this is a one-way research preview.
+- [ ] Publish model cards with intended use, limits, and failure modes.
 
 ## Limitations
 
 - **Not for clinical use.** Outputs are synthetic research images and have not
   been reviewed by pathologists or validated for diagnosis.
+- **Not bidirectional yet.** The UI/API scaffold is bidirectional in intent, but
+  only a forward trainer exists; there is no trained reverse model or unified
+  router.
 - **Current weights are panCK, not DAPI.** The channel-order correction
   invalidates the old demo and metrics for DAPI.
 - **No reverse model.** DAPI → H&E is a placeholder, not a trained product.

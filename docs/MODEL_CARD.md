@@ -12,6 +12,8 @@ trained yet.
 
 | Item | Value |
 |---|---|
+| Product target | Bidirectional H&E ↔ DAPI in one plugin/API |
+| Current release | One-way forward baseline only; not a bidirectional product |
 | Task (intended) | H&E RGB → DAPI grayscale |
 | Task (current weights) | H&E RGB → panCK (ablation only) |
 | Direction | One-way; DAPI → H&E is not available |

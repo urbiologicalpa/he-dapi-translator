@@ -1,7 +1,7 @@
 [project]
 name = "he-dapi-translator"
 version = "0.1.0"
-description = "H&E -> DAPI virtual staining (alpha): patch + WSI, Docker + napari"
+description = "Bidirectional H&E <-> DAPI virtual staining product scaffold (alpha; forward baseline only)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

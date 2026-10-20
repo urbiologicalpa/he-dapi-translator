@@ -8,11 +8,13 @@
 > being retrained; these weights will be replaced. **Do not use this package as
 > a DAPI solution yet.** Research demo only — not for clinical use.
 
-**H&E → DAPI virtual staining — inference library + CLI (alpha).**
+**H&E ↔ DAPI virtual staining toolkit — inference library + CLI (alpha; forward
+baseline only).**
 
-Intended to predict a virtual **DAPI** fluorescence image from a brightfield
-**H&E** patch. The current checkpoint was trained on the wrong HEMIT channel and
-should be treated as an H&E → panCK ablation. Weights are downloaded
+Intended product: one library/CLI for both H&E → DAPI and DAPI → H&E. The
+current implementation exposes only the forward direction; the reverse trainer
+is a skeleton. The current forward checkpoint was trained on the wrong HEMIT
+channel and should be treated as an H&E → panCK ablation. Weights are downloaded
 automatically from the
 [Hugging Face model repo](https://huggingface.co/urbiologicalpa/he-dapi-translator).
 
