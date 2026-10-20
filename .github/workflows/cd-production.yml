@@ -55,12 +55,14 @@ jobs:
         run: |
           echo "Post-deploy: verify tags exist, then run hosted /health against prod URL."
           echo "Prod URL placeholder: set PROD_URL repo variable (HF Space or VM) to enable live poll."
-      - name: Attach release artifacts (ONNX + metrics, if present)
+      - name: Attach release artifacts (status docs; corrected weights added later)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           fail_on_unmatched_files: false
+          # Do NOT attach docs/metrics_eval.json or *.onnx until they belong to a
+          # corrected H&E -> DAPI model. Current artifacts are the panCK ablation.
           files: |
-            docs/metrics_eval.json
-            resources/models/checkpoints/he2dapi/*.onnx
+            docs/RESULTS.md
+            docs/MODEL_CARD.md
