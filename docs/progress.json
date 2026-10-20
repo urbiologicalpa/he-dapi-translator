@@ -117,5 +117,18 @@
       "date": "2026-10-20",
       "note": "Added benchmark plan and post-200 ablation release gate; DAPI release remains v0.2.0."
     }
-  ]
+  ],
+  "kaggle": {
+    "checked_utc": "2026-10-20T17:50:00Z",
+    "dapi_job": "not_started",
+    "reason": "corrected 1024 H5 not built/uploaded",
+    "gpu_remaining_hours": 29.99,
+    "quota_refresh": "2026-10-24T00:00:00",
+    "old_kernels": [
+      "bikasash/he-dapi-product-gpu-train",
+      "bikasash/he-dapi-full-val",
+      "bikasash/he-dapi-gpu-probe2"
+    ],
+    "runbook": "docs/KAGGLE_DAPI.md"
+  }
 }

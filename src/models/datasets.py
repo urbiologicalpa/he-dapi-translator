@@ -35,9 +35,10 @@ class PairedHEMITDataset(Dataset):
     """
     def __init__(self, h5_path: str = None, root_dir: str = None, split: str = "train",
                  patch_size: int = 512, stain_norm: str = "none", augment: bool = True,
-                 max_cache_mb: int = 4, indices=None):
+                 augmentation: dict = None, max_cache_mb: int = 4, indices=None):
         self.patch_size = patch_size
         self.augment = augment
+        self.augmentation = augmentation or {}
         self.stain_norm = stain_norm
         self.h5_path = h5_path
         self.root_dir = Path(root_dir) if root_dir else None
@@ -94,12 +95,23 @@ class PairedHEMITDataset(Dataset):
         if augment:
             try:
                 import albumentations as A
-                self._alb = A.Compose([
-                    A.HorizontalFlip(p=0.5),
-                    A.VerticalFlip(p=0.5),
-                    A.RandomRotate90(p=0.3),
-                    A.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.05, hue=0.02, p=0.3),
-                ])
+                aug = self.augmentation
+                transforms = []
+                if aug.get("hflip", 0.5) > 0:
+                    transforms.append(A.HorizontalFlip(p=aug.get("hflip", 0.5)))
+                if aug.get("vflip", 0.5) > 0:
+                    transforms.append(A.VerticalFlip(p=aug.get("vflip", 0.5)))
+                if aug.get("rotate90", 0.3) > 0:
+                    transforms.append(A.RandomRotate90(p=aug.get("rotate90", 0.3)))
+                jitter = aug.get("color_jitter")
+                if jitter:
+                    params = dict(jitter) if isinstance(jitter, dict) else {}
+                    transforms.append(A.ColorJitter(**params, p=aug.get("color_jitter_p", 0.3)))
+                affine = aug.get("affine")
+                if affine:
+                    params = dict(affine) if isinstance(affine, dict) else {}
+                    transforms.append(A.Affine(**params, p=aug.get("affine_p", 0.3)))
+                self._alb = A.Compose(transforms) if transforms else None
             except ImportError:
                 self._alb = None
 
@@ -140,6 +152,17 @@ class PairedHEMITDataset(Dataset):
                 dapi = h5f["he"][real_idx][...,0]  # fallback
             if dapi.ndim==3:
                 dapi = dapi[...,0]  # take first channel
+            if he.shape[0] != self.patch_size or he.shape[1] != self.patch_size:
+                h, w = he.shape[:2]
+                if h >= self.patch_size and w >= self.patch_size:
+                    y0 = (h - self.patch_size) // 2
+                    x0 = (w - self.patch_size) // 2
+                    he = he[y0:y0+self.patch_size, x0:x0+self.patch_size]
+                    dapi = dapi[y0:y0+self.patch_size, x0:x0+self.patch_size]
+                elif Image is not None:
+                    size = (self.patch_size, self.patch_size)
+                    he = np.array(Image.fromarray(he).resize(size))
+                    dapi = np.array(Image.fromarray(dapi).resize(size))
         elif self._files:
             # Directory mode: heuristic pairing or single file
             p = self._files[idx % len(self._files)]

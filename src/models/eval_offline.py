@@ -18,7 +18,9 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 
-def evaluate(checkpoint_path: str, split: str = "val", num: int = 30):
+def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
+             h5_path: str = None, patch_size: int = 512, ngf: int = 64,
+             data_root: str = "data/raw/hemit"):
     from src.models.train_paired import UNetGenerator, PatchGANDiscriminator
     from src.models.datasets import PairedHEMITDataset
     from src.models.losses import SSIMLoss, NucleiDiceLoss
@@ -28,13 +30,13 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30):
         "train": "data/processed/hemit_train_512.h5",
         "test": "data/processed/hemit_test_512.h5",
     }
-    h5_path = h5_map.get(split, h5_map["val"])
+    h5_path = h5_path or h5_map.get(split, h5_map["val"])
     ckpt = torch.load(checkpoint_path, map_location="cpu")
-    file_epoch = ckpt.get("epoch", 0) + 1
-    train_gloss = float(ckpt.get("loss", 0))
+    file_epoch = ckpt.get("epoch", 0) + 1 if isinstance(ckpt, dict) and "epoch" in ckpt else 0
+    train_gloss = float(ckpt.get("loss", 0)) if isinstance(ckpt, dict) else 0.0
 
-    G = UNetGenerator(ngf=64)
-    G.load_state_dict(ckpt["G"])
+    G = UNetGenerator(ngf=ngf)
+    G.load_state_dict(ckpt.get("G", ckpt.get("generator", ckpt)))
     G.eval()
     D = PatchGANDiscriminator()
     if "D" in ckpt:
@@ -42,7 +44,7 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30):
     D.eval()
 
     ds = PairedHEMITDataset(
-        h5_path=h5_path, root_dir="data/raw/hemit",
+        h5_path=h5_path, root_dir=data_root, patch_size=patch_size,
         augment=False, indices=range(num), max_cache_mb=4,
     )
     loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=0)
@@ -79,6 +81,7 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30):
         "checkpoint": str(checkpoint_path),
         "file_epoch": file_epoch,
         "split": split,
+        "resolution": patch_size,
         "n": n,
         "train_G_loss": round(train_gloss, 4),
         "val_L1": round(L1 / n, 4),
@@ -100,8 +103,13 @@ def main():
     ap.add_argument("--out", type=str, default=None, help="write a single labeled result JSON to this path")
     ap.add_argument("--label", type=str, default=None, help="experiment label, e.g. panck-ch2-ablation")
     ap.add_argument("--target", type=str, default=None, help="target definition, e.g. 'DAPI ch0' or 'panCK ch2'")
+    ap.add_argument("--h5", type=str, default=None, help="override HDF5 path")
+    ap.add_argument("--patch-size", type=int, default=512)
+    ap.add_argument("--ngf", type=int, default=64)
+    ap.add_argument("--data-root", type=str, default="data/raw/hemit")
     args = ap.parse_args()
-    res = evaluate(args.checkpoint, args.split, args.num)
+    res = evaluate(args.checkpoint, args.split, args.num, h5_path=args.h5,
+                   patch_size=args.patch_size, ngf=args.ngf, data_root=args.data_root)
     if args.label:
         res["label"] = args.label
     if args.target:

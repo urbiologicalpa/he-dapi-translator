@@ -20,9 +20,9 @@ used `ch2` as the target. Consequences:
 
 | Run | Status | Details |
 |---|---|---|
-| Local CPU, 512px | Finishing panCK ablation | Epoch 199 saved; epoch 200 running at 17:09 UTC; ETA ~19:00 UTC 2026-10-20. Do not treat as DAPI. |
-| Kaggle T4 | Available, idle | 2× Tesla T4 15.64 GB, torch 2.11.0+cu128. 0.01h used, 29.99h remaining; resets 2026-10-24. |
-| Corrected 1024px DAPI | Blocked | Waiting for the ablation to finish, then build H5 and upload to Kaggle. |
+| Local CPU, 512px | Finishing panCK ablation | Epoch 199 saved; epoch 200 running at 17:09 UTC; ETA ~19:45–20:00 UTC 2026-10-20. Do not treat as DAPI. |
+| Kaggle T4 | Idle, no DAPI job | 2× Tesla T4 15.64 GB, torch 2.11.0+cu128. 0.01h used, 29.99h remaining; resets 2026-10-24. Old kernels are panCK. |
+| Corrected 1024px DAPI | Blocked | Waiting for the ablation to finish, then build H5 and upload data/code datasets. |
 | DAPI → H&E | Not started | Trainer is a smoke-test skeleton; no real weights. |
 
 ## Phases
@@ -45,16 +45,16 @@ progress.
 1. Let the panCK epoch 200 finish; archive it as an ablation.
 2. Run full 630 val + 945 test panCK evaluation into
    `docs/metrics_panck_512.json`.
-3. Fill `docs/BENCHMARK.md` and ship **v0.1.2-ablation** (benchmark + corrected
-   docs/data builder; explicitly not DAPI).
-4. Build corrected 1024px H5 with gzip (~10.4 GB total).
-5. Upload to a private Kaggle dataset.
-6. Run a 1-epoch 1024px U-Net sanity run on one T4 (batch 2), then train the
-   corrected DAPI baseline with checkpoint/resume.
-7. Evaluate full 630 val + 945 test; publish metrics with the target channel.
-8. Implement/vendor the dual-branch Swin-T + FMF generator.
-9. Plan reverse DAPI → H&E with honest "predicted H&E-like" labeling.
-10. Benchmark 512px tiled/INT8 deployment on the 3.7 GB box.
+3. Publish the ablation engineering note and full metrics in git; keep the
+   weights internal and do not tag a model release.
+4. Build corrected 1024px H5 with gzip and verify `dapi == mihc[...,0]`.
+5. Upload the data and code to private Kaggle datasets.
+6. Run the 512px Kaggle smoke test and record seconds/step + VRAM.
+7. Pretrain 40 epochs at 512, then fine-tune 20 epochs at 1024 with resume.
+8. Evaluate full 630 val + 945 test; publish metrics with the target channel.
+9. Implement/vendor the dual-branch Swin-T + FMF generator.
+10. Plan reverse DAPI → H&E with honest "predicted H&E-like" labeling.
+11. Benchmark 512px tiled/INT8 deployment on the 3.7 GB box.
 
 ## Commands
 
@@ -68,10 +68,15 @@ PYTHONPATH=. python -m pytest tests/test_hemit_channels.py tests/test_datasets.p
 uv run --extra data python -m scripts.data.pack_hemit_1024 \
   --splits train val test --patch-size 1024 --compression gzip
 
-# corrected training (on GPU, after data upload)
+# corrected DAPI training (on GPU, after data upload)
 PYTHONPATH=. python -m src.models.train_paired \
-  --config configs/hemit_dual_branch.yaml --resume auto --optimize-for full
+  --config configs/hemit_dapi_512_pretrain.yaml --resume auto --optimize-for full
+PYTHONPATH=. python -m src.models.train_paired \
+  --config configs/hemit_dapi_1024.yaml --resume auto --optimize-for full
 ```
+
+Kaggle data/code upload, smoke, pretrain, and fine-tune steps are in
+[`docs/KAGGLE_DAPI.md`](KAGGLE_DAPI.md).
 
 ## Milestones kept
 

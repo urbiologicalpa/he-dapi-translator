@@ -1,0 +1,48 @@
+# Corrected H&E -> DAPI (ch0) fine-tuning at native 1024px.
+# Initialize from the 512px DAPI checkpoint, then fine-tune at 1024.
+data:
+  name: hemit
+  root: data/raw/hemit
+  processed: data/processed/hemit_train_1024.h5
+  patch_size: 1024
+  split: [3717, 630, 945]
+  stain_norm: none
+  augment: false
+  lowram_subset: null
+
+model:
+  name: pix2pix_unet
+  generator:
+    arch: unet
+    ngf: 64
+  discriminator:
+    arch: patchgan
+    ndf: 64
+    n_layers: 3
+  loss:
+    gan_weight: 1.0
+    l1_weight: 100.0
+    ssim_weight: 10.0
+    dists_weight: 0.0
+    nuclei_aux_weight: 0.0
+
+training:
+  epochs: 20
+  batch_size: 1
+  grad_accum: 8
+  num_workers: 2
+  lr: 0.00005
+  beta1: 0.5
+  mixed_precision: false
+  precision: fp32
+  dists_on_cpu: false
+  checkpoint_dir: resources/models/checkpoints/he2dapi_dapi_1024
+  save_every: 1
+  resume: auto
+  export_onnx: false
+  oom_guard: true
+  max_cache_mb: 16
+
+experiment:
+  tracker: none
+  project: he-dapi-translator

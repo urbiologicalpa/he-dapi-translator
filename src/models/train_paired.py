@@ -59,7 +59,7 @@ class PatchGANDiscriminator(nn.Module):
         )
     def forward(self,x): return self.net(x)
 
-def train_one_epoch(G, D, loader, optimG, optimD, device, losses, weights, grad_accum=1, oom_guard=False, monitor=None):
+def train_one_epoch(G, D, loader, optimG, optimD, device, losses, weights, grad_accum=1, oom_guard=False, monitor=None, max_steps=None):
     G.train(); D.train()
     g_loss_accum = 0
     d_loss_accum = 0
@@ -71,6 +71,8 @@ def train_one_epoch(G, D, loader, optimG, optimD, device, losses, weights, grad_
     seen = 0
     optimG.zero_grad(); optimD.zero_grad()
     for step, batch in enumerate(loader):
+        if max_steps is not None and step >= max_steps:
+            break
         try:
             he = batch["he"].to(device)    # Bx3xHxW in [-1,1]
             dapi = batch["dapi"].to(device) # Bx1xHxW in [0,1]
@@ -194,6 +196,10 @@ def main():
     ap.add_argument("--optimize-for", type=str, default="lowram", choices=["lowram","full"], help="lowram throttles batch/DISTS for 3.7GB box")
     ap.add_argument("--batch-size", type=int, default=None, help="override batch size")
     ap.add_argument("--grad-accum", type=int, default=None, help="override grad accum")
+    ap.add_argument("--h5", type=str, default=None, help="override training HDF5 path")
+    ap.add_argument("--checkpoint-dir", type=str, default=None, help="override checkpoint directory")
+    ap.add_argument("--epochs", type=int, default=None, help="override number of epochs")
+    ap.add_argument("--max-steps", type=int, default=None, help="stop each epoch after N steps (smoke/timing)")
     args = ap.parse_args()
 
     # Resource monitor early
@@ -214,6 +220,10 @@ def main():
     train_cfg = cfg.get("training", {})
     model_cfg = cfg.get("model", {})
     loss_cfg = model_cfg.get("loss", {})
+    if args.h5:
+        data_cfg["processed"] = args.h5
+    if args.checkpoint_dir:
+        train_cfg["checkpoint_dir"] = args.checkpoint_dir
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[DEVICE] {device} (optimize_for={args.optimize_for})")
@@ -252,7 +262,8 @@ def main():
     ds = PairedHEMITDataset(h5_path=h5_path, root_dir=root_dir,
                             patch_size=data_cfg.get("patch_size",512),
                             stain_norm=data_cfg.get("stain_norm","none"),
-                            augment=True,
+                            augment=data_cfg.get("augment", True),
+                            augmentation=data_cfg.get("augmentation"),
                             indices=indices,
                             max_cache_mb=train_cfg.get("max_cache_mb",4))
     loader_batch = args.batch_size or train_cfg.get("batch_size",2)
@@ -273,10 +284,11 @@ def main():
     use_dists = train_cfg.get("dists_on_cpu", False) and args.optimize_for!="lowram"
     if not use_dists:
         print("[LOWRAM] DISTS disabled on CPU (saves 400MB VGG) -> using L1+SSIM only")
+    use_nuclei = loss_cfg.get("nuclei_aux_weight", 2.0) > 0
     losses = {
         "ssim": SSIMLoss(),
         "dists": DISTSLoss() if use_dists else None,
-        "nuclei": NucleiDiceLoss()
+        "nuclei": NucleiDiceLoss() if use_nuclei else None,
     }
     # filter None
     losses = {k:v for k,v in losses.items() if v is not None}
@@ -316,6 +328,10 @@ def main():
                 optimG.load_state_dict(ckpt["optimG"])
             if "optimD" in ckpt:
                 optimD.load_state_dict(ckpt["optimD"])
+            for pg in optimG.param_groups:
+                pg["lr"] = train_cfg.get("lr", 2e-4)
+            for pg in optimD.param_groups:
+                pg["lr"] = train_cfg.get("lr", 2e-4)
             start_epoch = ckpt.get("epoch", 0) + 1
             if args.resume_epoch is not None:
                 start_epoch = args.resume_epoch
@@ -323,14 +339,14 @@ def main():
         except Exception as e:
             print(f"[RESUME WARN] Failed to load {resume_path}: {e}, starting from 0")
 
-    epochs = 2 if args.dummy else train_cfg.get("epochs",200)
+    epochs = 2 if args.dummy else (args.epochs or train_cfg.get("epochs",200))
     save_every = train_cfg.get("save_every", 1)  # checkpoint every N epochs
     grad_accum = args.grad_accum or train_cfg.get("grad_accum", 1)
     oom_guard = train_cfg.get("oom_guard", True)
     print(f"[TRAIN] epochs {epochs} batch {loader_batch} grad_accum {grad_accum} effective {loader_batch*grad_accum} | oom_guard {oom_guard} | device {device}")
     for epoch in range(start_epoch, epochs):
         if mon: mon.check(f"train:epoch{epoch+1}:start")
-        loss = train_one_epoch(G,D,loader,optimG,optimD,device,losses,weights, grad_accum=grad_accum, oom_guard=oom_guard, monitor=mon)
+        loss = train_one_epoch(G,D,loader,optimG,optimD,device,losses,weights, grad_accum=grad_accum, oom_guard=oom_guard, monitor=mon, max_steps=args.max_steps)
         # new dict form (g/d/components) — keep ckpt["loss"] as G for history continuity
         if isinstance(loss, dict):
             g_loss = loss["g"]
