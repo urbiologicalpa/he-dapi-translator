@@ -253,7 +253,9 @@ Reference numbers from the HEMIT paper (DAPI column, for orientation only):
 | Pix2Pix U-Net | 0.775 | 0.652 | 27.691 |
 | Dual-branch (paper) | **0.815** | **0.716** | **28.610** |
 
-These are paper results on HEMIT, not results from this repository.
+These are paper results on HEMIT, not results from this repository. The
+comparison protocol and table templates are in
+[`docs/BENCHMARK.md`](docs/BENCHMARK.md).
 
 ### panCK ablation (do not read as DAPI)
 
@@ -293,6 +295,7 @@ Generated artifacts are git-ignored:
 - [x] Identify and fix the DAPI channel-order bug (`ch0`, not `ch2`).
 - [x] Add channel-order regression tests and a corrected 1024px builder.
 - [x] Confirm Kaggle T4 availability and the free GPU quota path.
+- [ ] Archive the panCK ablation and publish full 630/945 benchmark numbers.
 - [ ] Build and verify corrected 1024px HEMIT HDF5.
 - [ ] Train corrected U-Net H&E → DAPI baseline on 1024px data.
 - [ ] Run the full 630-image validation and 945-image held-out test evaluation.

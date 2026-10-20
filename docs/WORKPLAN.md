@@ -1,5 +1,5 @@
 # Workplan: H&E <-> DAPI Drag & Drop Translator
-Version: 1.0 | Date: 2026-08-30 | Author: OpenCode + User
+Version: 1.1 | Date: 2026-10-20 | Author: OpenCode + User
 Location: `/home/bikash/he-dapi-translator`
 
 ## 0. Goal
@@ -68,6 +68,34 @@ Metrics (see `resources/models/README.md`):
 - Bio: Dice nuclei segmentation, cell density correlation, MSE per channel (DAPI 0.12 vs 0.26 CycleGAN in mSIGHT)
 - Human: pathologist blind test (52% distinguishability in DGR paper = indistinguishable)
 
+### Phase 2.5 — Benchmark & release gates (after epoch 200)
+
+**What ships after the 200-epoch run:** an **ablation benchmark release**, not a
+DAPI model. The run is H&E -> panCK because of the old channel bug. Shipping it
+as DAPI would be false.
+
+Deliverables:
+
+- [ ] Archive `checkpoint_epoch200.pt`, `generator_last.pt`, config, git SHA and
+      checkpoint hash under the ablation record.
+- [ ] Run full panCK evaluation on **630 val + 945 test** using the legacy 512px
+      H5; write `docs/metrics_panck_512.json` (not `docs/metrics_eval.json`).
+- [ ] Fill `docs/BENCHMARK.md` with measured panCK numbers, clearly labeled.
+- [ ] Tag/publish **v0.1.2-ablation** (or a GitHub pre-release) with:
+      README/model card correction, benchmark tables, corrected 1024px data
+      builder, and "not DAPI" notice. Do not publish a DAPI claim.
+- [ ] Keep PyPI/HF weights labeled as the ablation until corrected DAPI weights
+      exist; no new DAPI package release from this run.
+- [ ] Production approval stays manual per `AGENTS.md`; do not auto-approve.
+
+**Release gates for the eventual DAPI model (v0.2.0):**
+
+- [ ] Corrected 1024px H5 verified (`dapi == mihc[...,0]`).
+- [ ] Full 630 val + 945 test metrics recorded with target channel.
+- [ ] Checkpoint manifest includes target, resolution, split, git SHA.
+- [ ] Demo/package/HF/Docker all load the same corrected checkpoint.
+- [ ] No panCK metrics or ONNX attached to the DAPI release.
+
 ### Phase 3 — Drag & Drop Tool / Plugin (Week 8-10)
 **Frontend (React):**
 - [ ] `src/frontend`: Dropzone (supports .png .tiff .svs), preview grid, WSI viewer (OpenSeadragon)
@@ -98,7 +126,7 @@ Standard ML deploy stages (Databricks MLOps: Data Validation -> Training -> Vali
 | 0 CI (`ci.yml`) | push `main`/`staging` + PR | `progress_tracker --enforce` + `test_resource_guards` (11) + backend `/health` smoke | green check |
 | 1 Build (`cd-staging.yml`) | push `staging` | Docker build once, tag = git SHA | `ghcr.io/...:<sha>` + `:staging` |
 | 2 Staging (`cd-staging.yml`, env `staging`) | auto after build | guards + `/health` + `/models` + dummy `/translate` smoke; human UAT (512px both directions, SYNTHETIC header, 429 guard, `/translate/wsi`) | UAT sign-off |
-| 3 Production (`cd-production.yml`, env `production`) | `git tag vX.Y.Z` on `main` / Release published; needs staging SHA success + reviewer approval | promote SAME SHA `:staging -> :vX.Y.Z + :latest` (no rebuild); optional Docker Hub mirror; attach ONNX + `metrics_eval.json` to Release | prod release; rollback = re-tag previous `v*` |
+| 3 Production (`cd-production.yml`, env `production`) | `git tag vX.Y.Z` on `main` / Release published; needs staging SHA success + reviewer approval | promote SAME SHA `:staging -> :vX.Y.Z + :latest` (no rebuild); optional Docker Hub mirror; attach status docs only until corrected DAPI metrics/ONNX exist | prod release; rollback = re-tag previous `v*` |
 
 - [ ] Dockerfile (see `docker/Dockerfile` scaffold): multi-stage, python slim + node build + cuda runtime + OCI labels
 - [ ] docker-compose for local: frontend:3000, backend:8000, mlflow:5000
@@ -132,11 +160,13 @@ See `docs/NOVELTY_REPORT.md` (summary: H&E->DAPI well-published since 2024, but 
 - Dataset download scripts
 - Model checkpoints (git-lfs or hf hub)
 
-## 5. Immediate Next Steps (You can run now)
-1. `bash resources/datasets/download_hemit.sh`
-2. `python src/models/train_paired.py --config configs/hemit_dual_branch.yaml`
-3. `docker build -t he-dapi-translator -f docker/Dockerfile .`
-4. `docker compose -f docker/docker-compose.yml up`
+## 5. Immediate Next Steps (2026-10-20)
+1. Wait for the panCK epoch-200 checkpoint; archive it as an ablation.
+2. Run full `val`/`test` panCK evaluation into `docs/metrics_panck_512.json`
+   using `src/models/eval_offline.py --out ... --label ... --target ...`.
+3. Fill `docs/BENCHMARK.md` and publish **v0.1.2-ablation** (not DAPI).
+4. Build corrected 1024px HDF5 with `scripts/data/pack_hemit_1024.py`.
+5. Upload to Kaggle and train the corrected U-Net DAPI baseline.
 
 ## 6. Timeline Gantt
 W1-2 Infra+Data | W2-4 Data | W4-8 Modeling | W8-10 App | W10-11 Valid | W11-12 Docker

@@ -31,7 +31,11 @@
       "name": "Scoping & Infra",
       "status": "DONE",
       "percent": 100,
-      "artifacts": ["pyproject.toml", "docs/WORKPLAN.md", "docker/"],
+      "artifacts": [
+        "pyproject.toml",
+        "docs/WORKPLAN.md",
+        "docker/"
+      ],
       "optimization": "low-RAM defaults, ResourceMonitor"
     },
     {
@@ -76,7 +80,9 @@
       "name": "Validation",
       "status": "TODO",
       "percent": 5,
-      "artifacts": ["docs/RESULTS.md"],
+      "artifacts": [
+        "docs/RESULTS.md"
+      ],
       "optimization": "full 630 val + 945 test; no 30-image claims"
     },
     {
@@ -94,6 +100,8 @@
   ],
   "next_actions": [
     "Finish and archive the panCK ablation run",
+    "Run full 630 val + 945 test panCK eval into docs/metrics_panck_512.json",
+    "Fill docs/BENCHMARK.md and ship v0.1.2-ablation (not DAPI)",
     "Build corrected 1024px HEMIT HDF5 and verify dapi == mihc[...,0]",
     "Upload to private Kaggle dataset and run a 1-epoch T4 sanity check",
     "Train corrected U-Net H&E -> DAPI baseline",
@@ -104,6 +112,10 @@
     {
       "date": "2026-10-20",
       "note": "Fixed DAPI channel order (ch0); added 1024 builder and tests; Kaggle T4 confirmed; README/docs corrected to match implemented U-Net baseline; panCK ablation finishing."
+    },
+    {
+      "date": "2026-10-20",
+      "note": "Added benchmark plan and post-200 ablation release gate; DAPI release remains v0.2.0."
     }
   ]
 }

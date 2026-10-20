@@ -3,7 +3,7 @@ eval_offline.py - Low-RAM read-only eval, NEVER disturbs running training.
 Computes on any checkpoint: L1, PSNR, SSIM-loss(proxy), Dice(thresh 0.1), D-loss.
 Usage:
   PYTHONPATH=. .venv/bin/python -m src.models.eval_offline --checkpoint resources/models/checkpoints/he2dapi/checkpoint_epoch53.pt --split val --num 30
-Saves JSON to docs/metrics_eval.json when --save.
+Saves JSON to docs/metrics_eval.json when --save, or one labeled file with --out.
 Low-RAM: batch 1, CPU, no_grad, SWMR, gc every 10, max_cache 4MB.
 """
 import argparse
@@ -97,10 +97,22 @@ def main():
     ap.add_argument("--split", type=str, default="val")
     ap.add_argument("--num", type=int, default=30)
     ap.add_argument("--save", action="store_true", help="append to docs/metrics_eval.json")
+    ap.add_argument("--out", type=str, default=None, help="write a single labeled result JSON to this path")
+    ap.add_argument("--label", type=str, default=None, help="experiment label, e.g. panck-ch2-ablation")
+    ap.add_argument("--target", type=str, default=None, help="target definition, e.g. 'DAPI ch0' or 'panCK ch2'")
     args = ap.parse_args()
     res = evaluate(args.checkpoint, args.split, args.num)
+    if args.label:
+        res["label"] = args.label
+    if args.target:
+        res["target"] = args.target
     print(json.dumps(res, indent=2))
-    if args.save:
+    if args.out:
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(res, indent=2) + "\n")
+        print(f"[SAVED] {out}")
+    elif args.save:
         out = Path("docs/metrics_eval.json")
         hist = []
         if out.exists():

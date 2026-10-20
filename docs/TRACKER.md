@@ -43,14 +43,18 @@ progress.
 ## Next actions
 
 1. Let the panCK epoch 200 finish; archive it as an ablation.
-2. Build corrected 1024px H5 with gzip (~10.4 GB total).
-3. Upload to a private Kaggle dataset.
-4. Run a 1-epoch 1024px U-Net sanity run on one T4 (batch 2), then train the
+2. Run full 630 val + 945 test panCK evaluation into
+   `docs/metrics_panck_512.json`.
+3. Fill `docs/BENCHMARK.md` and ship **v0.1.2-ablation** (benchmark + corrected
+   docs/data builder; explicitly not DAPI).
+4. Build corrected 1024px H5 with gzip (~10.4 GB total).
+5. Upload to a private Kaggle dataset.
+6. Run a 1-epoch 1024px U-Net sanity run on one T4 (batch 2), then train the
    corrected DAPI baseline with checkpoint/resume.
-5. Evaluate full 630 val + 945 test; publish metrics with the target channel.
-6. Implement/vendor the dual-branch Swin-T + FMF generator.
-7. Plan reverse DAPI → H&E with honest "predicted H&E-like" labeling.
-8. Benchmark 512px tiled/INT8 deployment on the 3.7 GB box.
+7. Evaluate full 630 val + 945 test; publish metrics with the target channel.
+8. Implement/vendor the dual-branch Swin-T + FMF generator.
+9. Plan reverse DAPI → H&E with honest "predicted H&E-like" labeling.
+10. Benchmark 512px tiled/INT8 deployment on the 3.7 GB box.
 
 ## Commands
 
