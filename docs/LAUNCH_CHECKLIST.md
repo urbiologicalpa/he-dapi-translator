@@ -1,5 +1,12 @@
 # Launch Checklist — v1.0 (H&E ↔ DAPI Virtual Staining)
 
+> **Superseded status (2026-10-20):** the checkpoint produced by the previous
+> run is **H&E → panCK**, not DAPI, because of a HEMIT channel-order bug. Do not
+> use this checklist to launch it as a DAPI model. See `README.md`,
+> `docs/MODEL_CARD.md`, and `docs/RESULTS.md` for the corrected plan. This file
+> is retained as the launch process template for after the corrected DAPI model
+> and full evaluation exist.
+
 Goal: one coordinated launch **after** training completes and the real backend+frontend demo
 ships — not a trickle. This turns a 0-star repo into something shareable and citable.
 
@@ -9,7 +16,8 @@ Positioning (the hook):
 ---
 
 ## 0. Sequencing (do NOT launch before these)
-- [ ] Training reaches **epoch 200** (~Oct-20) and final metrics are recorded (PSNR/SSIM/PSNR-peak).
+- [ ] **Corrected DAPI data** (`dapi = ch0`) is built and verified.
+- [ ] Corrected H&E → DAPI training reaches its target epoch and final metrics are recorded on the full 630-image val split.
 - [ ] **v1.0** release cut: real **backend (FastAPI)** + **frontend** demo, not the stopgap Space.
 - [ ] Space weights refreshed with the **epoch-200** ONNX.
 - [ ] README "Results" gallery shows real before/after (issue #8).

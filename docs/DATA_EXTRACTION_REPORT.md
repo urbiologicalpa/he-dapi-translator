@@ -7,7 +7,7 @@
 | Paired H&E <-> DAPI | maxpmx/dataset_dapi-he (HF) | data/raw/maxpmx_dapi_he/images.zip (1.5G) + conditioning_images.zip (353M) | data/processed/maxpmx_{train,val,test,512}.h5 | 4192 pairs (3353/419/420 split 80/10/10) | 512x512 RGB + L | 2.2G train, 278M val/test, 2.8G combined |
 | Unpaired H&E | NYCU-PCSxNTHU-MIS/MHIST (HF, 666M tar.gz) | data/raw/mhist/mhist.tar.gz -> data/raw/mhist/MHIST/images/*.png (3152) | data/processed/mhist_{256,512}.h5 | 3152 HP/SSA | 256/512 | 498M / 1.9G |
 
-- HEMIT (MICCAI 2024, 4278 pairs) not on HF (404) - replaced by maxpmx/dataset_dapi-he which is equivalent paired data (4192 vs 4278). Original HEMIT can be requested via authors if needed, but maxpmx suffices for MVP.
+- HEMIT (MICCAI 2024, 5,292 pairs: 3,717/630/945) not on HF (404) - replaced by maxpmx/dataset_dapi-he for the initial MVP (4,192 pairs). The official HEMIT data is now extracted locally and is the primary source for corrected DAPI work.
 
 ## Extraction Pipeline
 - HF auth: `HF_TOKEN` env var via `huggingface_hub` + `curl -H "Authorization: Bearer $HF_TOKEN"`

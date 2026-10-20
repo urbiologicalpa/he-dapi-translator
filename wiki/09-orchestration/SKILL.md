@@ -4,7 +4,7 @@ You coordinate all sub-agents and ensure no crash on this 3.7GB box.
 
 ## Workflow (resumable, spike-guarded)
 
-1. **Data** (`02`): `pack_hemit.py` streaming combined (peak 140MB). Resumable: skip if `he.shape[0]==len(pairs)`, atomic `.tmp→replace`, flush 500.
+1. **Data** (`02`): `scripts/data/pack_hemit.py` streaming combined (peak 140MB). Resumable: skip if `he.shape[0]==len(pairs)`, atomic `.tmp→replace`, flush 500.
 2. **Dataset** (`03`): lazy H5 SWMR per worker, subset support.
 3. **Tiling** (`04`) + **WSI** (`05`): streaming merge to TIFF, not full canvas.
 4. **Training** (`06`): batch 2 + grad_accum 4, DISTS off on CPU, num_workers 0, OOM try/catch.
@@ -27,7 +27,7 @@ make health     # resource check
 ## Recovery
 Every long step is `nohup + tee + checkpoint`:
 ```bash
-nohup .venv/bin/python pack_hemit.py 2>&1 | tee /tmp/pack_hemit.log &
+nohup .venv/bin/python scripts/data/pack_hemit.py 2>&1 | tee /tmp/pack_hemit.log &
 # resume: re-run same command (skip if complete)
 ```
 

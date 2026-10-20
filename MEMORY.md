@@ -1,5 +1,15 @@
 # MEMORY - H&E <-> DAPI Session Checkpoint 2026-09-27
 
+> **2026-10-20 correction:** HEMIT labels are `ch0=DAPI, ch1=CD3, ch2=panCK`.
+> The previous 512px pipeline used `ch2`, so the epoch-199/200 run, current HF
+> weights, demo, and `docs/metrics_eval.json` are a **panCK ablation, not DAPI**.
+> Fixes: `scripts/data/pack_hemit.py`, `scripts/data/pack_hemit_1024.py`,
+> `src/models/datasets.py`, `tests/test_hemit_channels.py`. Current canonical
+> status: `README.md`, `docs/MODEL_CARD.md`, `docs/RESULTS.md`, `docs/TRACKER.md`.
+> Kaggle T4 path is verified (2x T4 15.64GB); corrected 1024px DAPI training is
+> the next milestone. Everything below this banner is historical unless it
+> agrees with the 2026-10-20 docs.
+
 > Updated 2026-10-18 15:25 UTC: 🟢 RUNNING PID1081 epoch183/200 (~91%). **ALL SHIPPED**: GitHub **Release v0.1.0** + prod promote (GHCR `:v0.1.0`+`:latest`); **HF model repo + FREE Static Space (in-browser ONNX) demo**; GitHub Pages; **PyPI packages `he-dapi` + `napari-he-dapi` v0.1.1 (alpha)** (`pip install he-dapi`); package + dummy-training tests in CI. Fixed cd-production (tag-push-only trigger + pinned checkout). ~17 left → ~Oct-20, pace ~2.4h/ep, best ep169 1.5302. KAGGLE OFF. Tokens: `~/.github_pat`, `~/.hf_token`, `~/.pypi_token` (all 600).
 
 ## Session log — 2026-10-18 (deliverables shipped)

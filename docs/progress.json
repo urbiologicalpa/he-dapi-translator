@@ -1,444 +1,109 @@
 {
   "project": "he-dapi-translator",
+  "updated": "2026-10-20T17:00:00Z",
+  "status": "alpha; panCK ablation only; corrected DAPI training pending",
   "overall_percent": 45,
   "machine": {
     "cpu": "Intel i5-10210U 8vCPU 4c/8t",
     "ram_gb": 3.7,
     "swap_gb": 1.0,
     "gpu": null,
-    "disk_free_gb": 867,
+    "kaggle_gpu": "2x Tesla T4 15.64GB (verified 2026-10-20)",
+    "disk_free_gb": 911,
     "budget_per_process_gb": 1.5,
     "spike_threshold_mb": 500,
-    "wsI_canvas_budget_mb": 512
+    "wsi_canvas_budget_mb": 512
+  },
+  "critical_correction": {
+    "date": "2026-10-20",
+    "issue": "HEMIT labels are ch0=DAPI, ch1=CD3, ch2=panCK; the previous pipeline used ch2.",
+    "impact": "The current checkpoints, docs/metrics_eval.json, HF weights and demo are an H&E -> panCK ablation, not DAPI.",
+    "fixed_in": [
+      "scripts/data/pack_hemit.py",
+      "scripts/data/pack_hemit_1024.py",
+      "src/models/datasets.py",
+      "tests/test_hemit_channels.py"
+    ]
   },
   "phases": [
     {
       "id": 0,
-      "name": "Scoping & Infra (W1-2)",
+      "name": "Scoping & Infra",
       "status": "DONE",
       "percent": 100,
-      "artifacts": [
-        "docs/WORKPLAN.md",
-        "pyproject.toml",
-        "wiki/01-machine-profile/"
-      ],
-      "optimization": "pyproject fix, lazy imports, ResourceMonitor"
+      "artifacts": ["pyproject.toml", "docs/WORKPLAN.md", "docker/"],
+      "optimization": "low-RAM defaults, ResourceMonitor"
     },
     {
       "id": 1,
-      "name": "Data (W2-4)",
-      "status": "DONE",
+      "name": "Data",
+      "status": "DONE_CORRECTED",
       "percent": 100,
       "artifacts": [
-        "data/processed/hemit_train_512.h5 (3717)",
-        "data/processed/mhist_512.h5 (3152)",
-        "pack_hemit.py streaming"
+        "scripts/data/pack_hemit_1024.py",
+        "tests/test_hemit_channels.py",
+        "docs/DATA.md"
       ],
-      "optimization": "chunked H5 B=100 peak 140MB vs 10.6GB, SWMR"
+      "optimization": "streaming HDF5; Macenko optional; gzip level 4"
     },
     {
       "id": 2,
-      "name": "Modeling (W4-8) Dual Track",
+      "name": "Modeling",
       "status": "IN_PROGRESS",
-      "percent": 84,
+      "percent": 45,
       "artifacts": [
-        "configs/hemit_dual_branch.yaml lowram",
-        "src/models/train_paired.py grad_accum + D-loss/component logging",
-        "src/models/losses.py Dice thresh 0.1 + SSIM proxy note",
-        "src/models/eval_offline.py + docs/metrics_eval.json",
-        "resources/models/checkpoints/he2dapi/checkpoint_epoch165.pt (165/200 done 82.5%, ep165 1.6031 +0.006 flat; D 0.7565 healthy; best stays ep163 1.5685; epoch166 running)"
+        "src/models/train_paired.py (U-Net baseline)",
+        "panCK ablation checkpoints (not DAPI)",
+        "Kaggle T4 verified"
       ],
-      "optimization": "batch 2+accum4, num_workers 0, dists_off, OOM catch"
+      "optimization": "batch 2, grad_accum 4, num_workers 0; GPU path next"
     },
     {
       "id": 3,
-      "name": "Drag & Drop Tool (W8-10)",
-      "status": "TODO",
-      "percent": 0,
+      "name": "Drag & Drop Tool",
+      "status": "ALPHA",
+      "percent": 60,
       "artifacts": [
-        "src/backend/main.py 429 guard",
-        "src/models/infer.py streaming"
+        "src/backend/main.py",
+        "src/frontend/",
+        "packages/he-dapi",
+        "packages/napari-he-dapi"
       ],
-      "optimization": "streaming TIFF, thumbnail before numpy"
+      "optimization": "tiled inference; 429 RAM guard"
     },
     {
       "id": 4,
-      "name": "Validation (W10-11)",
+      "name": "Validation",
       "status": "TODO",
-      "percent": 0,
-      "artifacts": [],
-      "optimization": "MC dropout streaming"
+      "percent": 5,
+      "artifacts": ["docs/RESULTS.md"],
+      "optimization": "full 630 val + 945 test; no 30-image claims"
     },
     {
       "id": 5,
-      "name": "Docker & Deploy (W11-12)",
-      "status": "TODO",
-      "percent": 0,
+      "name": "Docker & Deploy",
+      "status": "ALPHA",
+      "percent": 55,
       "artifacts": [
+        ".github/workflows/cd-staging.yml",
+        ".github/workflows/cd-production.yml",
         "docker/Dockerfile"
       ],
-      "optimization": "multi-stage slim"
-    }
-  ],
-  "daily_log": [
-    {
-      "date": "2026-08-31",
-      "note": "HEMIT stall 9.9G, resumable enforced, maxpmx/mhist done, 12.8G"
-    },
-    {
-      "date": "2026-09-19",
-      "note": "3.7GB crash \u2192 9 wiki sub-agents, all streaming, 11 guards verified, data 86G, tracker added"
-    },
-    {
-      "date": "2026-09-26",
-      "note": "torch 2.14 CPU installed (py3.14, 2.3.0 unsat), dummy smoke paired+unpaired passed, checkpoints resumable"
-    },
-    {
-      "date": "2026-09-26",
-      "note": "full train LAUNCHED PID 1793 epoch4/200 he2dapi batch2+accum4 resume auto, 1.3GB RAM"
-    },
-    {
-      "date": "2026-09-26",
-      "note": "PRODUCT-GRADE restored: FULL 3717 ngf64 n_blocks9 epochs200 batch2+accum4, PID 2138, 3.7GB + resume, NO compromise"
-    },
-    {
-      "date": "2026-09-27",
-      "note": "Kaggle GPU RUNNING bikasash/he-dapi-product-gpu-train T4, resume epoch10/200, local paused"
-    },
-    {
-      "date": "2026-09-27",
-      "note": "Kaggle paused (7.7G pull queue, logs empty), focus local CPU PID 12148 epoch11/200 01:04"
-    },
-    {
-      "date": "2026-09-28",
-      "note": "local reached epoch14/200 (ckpt 23:00 Sep-27), relaunched PID 1011 epoch15/200 log logs/train_paired.log; kaggle payload staged /tmp/kaggle_kernel_he_dapi, push blocked on token"
-    },
-    {
-      "date": "2026-09-28",
-      "note": "token saved ~/.kaggle/api_token, code dataset version pushed (zip auto-extracted to code_bundle/), kernel v8 RUNNING epoch15 (v5-v7 failed: subdir drop, zip-prefix, no-GPU); local PID 1011 step240 RAM 69%"
-    },
-    {
-      "date": "2026-09-28",
-      "note": "14:44 UTC: local epoch19 step1180 (~64%), ckpt19 ~15:35 UTC, RAM 54% steady. Kaggle v8 RUNNING 11.5h, output still locked"
-    },
-    {
-      "date": "2026-09-29",
-      "note": "02:45 UTC: kaggle v8 CANCEL_ACKNOWLEDGED; log salvaged: CPU-only, ep15-18, loss 2.27->2.21, slower than local. Local 23/200 (loss 2.15) WINS fork; kaggle STAND DOWN until GPU quota refreshes"
-    },
-    {
-      "date": "2026-09-29",
-      "note": "12:21 UTC: local 27/200 (13.5%), epoch28 step1220, 33.5h uptime, RAM ~55%, loss 2.126 and falling; kaggle still OFF"
-    },
-    {
-      "date": "2026-09-29",
-      "note": "15:32 UTC: local 28/200 (14%), epoch29 step1620 (~87%), ckpt29 ~15:55, RAM ~55%, loss 2.1155 new low; kaggle OFF"
-    },
-    {
-      "date": "2026-09-30",
-      "note": "02:46 UTC: local 33/200 (16.5%), epoch34 step1200 (~65%), ckpt34 ~03:30, 47.7h uptime, RAM ~55%, loss 2.0605 new low (best drop yet); kaggle OFF"
-    },
-    {
-      "date": "2026-09-30",
-      "note": "12:26 UTC: local 37/200 (18.5%), epoch38 step880 (~47%), ckpt38 ~13:30, 57.3h uptime, RAM ~52%, loss 2.0348 new low; found NO validation in train_paired.py (val_every unused) \u2014 Phase 4 gap; kaggle OFF"
-    },
-    {
-      "date": "2026-09-30",
-      "note": "16:25 UTC: local 38/200 (19%), epoch39 step880 (~47%), ckpt39 ~18:00, 60h uptime, loss 2.0164 new low; stall scare investigated = FALSE ALARM (advancing, ckpts on cadence; epoch39 ~2x slower, swap full, no sudo); kaggle OFF"
-    },
-    {
-      "date": "2026-10-01",
-      "note": "02:51 UTC: local 42/200 (21%), epoch43 step480 (~26%), ckpt43 ~04:45, 70.7h uptime, RAM 54%; MILESTONE loss broke 2.0 (1.9950 ep41, 1.9944 ep42); ep41-42 flat, plateau-vs-noise TBD; kaggle OFF"
-    },
-    {
-      "date": "2026-10-01",
-      "note": "06:45 UTC: local 43/200 (21.5%), epoch44 step1000 (~54%), ckpt44 ~07:45, 74.6h uptime, RAM ~53%; loss 1.9780 new low \u2014 plateau scare RESOLVED (was noise); kaggle OFF"
-    },
-    {
-      "date": "2026-10-01",
-      "note": "12:59 UTC: local 45/200 (22.5%), epoch46 step700 (~38%), ckpt46 ~15:10, pace ~3.4h/epoch, 80.8h uptime, RAM ~54%; loss 1.9718(ep44)/1.9876(ep45) \u2014 ep45 uptick likely noise; quarter mark (50) ~Oct-02 06:00; kaggle OFF"
-    },
-    {
-      "date": "2026-10-01",
-      "note": "17:02 UTC: local 46/200 (23%), epoch47 step1040 (~56%), ckpt47 ~18:20, pace ~3.2h, 84.8h uptime, RAM 50-53%; loss 1.9513(ep46) new low, biggest recent drop \u2014 ep45 uptick CONFIRMED noise; kaggle OFF"
-    },
-    {
-      "date": "2026-10-02",
-      "note": "02:33 UTC: local 49/200 (24.5%), epoch50 step300 (~16%), QUARTER MARK ckpt ~05:30, 94.3h uptime, RAM ~55%; loss 1.9452/1.9331/1.9290 new low steady; kaggle OFF"
-    },
-    {
-      "date": "2026-10-02",
-      "note": "QUARTER MARK: 50/200 epochs done, loss 1.9238, local CPU steady"
-    },
-    {
-      "date": "2026-10-02",
-      "note": "12:28 UTC: local 51/200 (25.5%), epoch52 step1420 (~76%), ckpt52 ~13:15, 100.3h uptime, RAM 50%; loss 1.8982(ep51) broke 1.90; kaggle OFF"
-    },
-    {
-      "date": "2026-10-02",
-      "note": "16:40 UTC: local 52/200 (26%), epoch53 step1100 (~59%), ckpt53 ~18:15, pace drifting 4.3h/epoch, 108.5h uptime, RAM ~50%; loss 1.9012(ep52) tiny uptick, noise watch; kaggle OFF"
-    },
-    {
-      "date": "2026-10-02",
-      "note": "17:10 UTC: pace diagnosis \u2014 12.0s/step measured (2.7x slower than day-1); causes narrowed to thermal/host (in-box clean); non-interrupting options = user-side only (power/cooling/close apps); ckpt53 ~19:20"
-    },
-    {
-      "date": "2026-10-02",
-      "note": "17:08 UTC: user chose KEEP RUNNING over reboot; verified PID 1011 (108.9h) + watch (PID 1567) both alive, nothing stopped; epoch53 step1200 (~65%), ckpt53 ~19:20; loss 1.9012; kaggle OFF"
-    },
-    {
-      "date": "2026-10-02",
-      "note": "18:45 UTC: epoch53 DONE (checkpoint_epoch53.pt + checkpoint_last.pt), loss 1.8942 NEW LOW \u2014 ep52 uptick confirmed noise; epoch54 started"
-    },
-    {
-      "date": "2026-10-03",
-      "note": "04:34 UTC: REBOOT (uptime 4min) killed PID 1011 + watch 1567 during epoch54 step1180 (~63%, log 21:59 Oct-02). Truth 53/200 done (26.5%), loss 1.8942. ~3.2h epoch54 progress lost, resume from epoch53. Fresh RAM 32%/2581MB, swap empty \u2014 good resume conditions. 147/200 remaining to goal."
-    },
-    {
-      "date": "2026-10-03",
-      "note": "04:39 UTC: RESUMED PID 935 epoch54/200 from checkpoint_epoch53.pt (loss 1.8942); watch restarted PID 971 with dynamic pgrep fix (was hardcoded 1011). RAM 44%/2152MB, CPU 339% healthy. Goal 200 FULL product."
-    },
-    {
-      "date": "2026-10-03",
-      "note": "05:03 UTC: FIXED gaps till ep53 without stopping PID 935 \u2014 train_paired.py now logs D-loss + gan/l1/ssim/nuclei (future resumes, ckpt loss stays G); losses.py Dice 0.5->0.1 (0.5 vacuous 1.0, 0.1 gives 0.11 val); eval_offline.py added + metrics_eval.json backfilled ep15/23/33/43/50/53 val N=30 (PSNR 29.0->29.3 peak 29.8, D 0.75-0.87 balanced, Dice 0.03->0.11 late gain). TrackB/MLflow/kornia/frontend correctly deferred (not misses). No files missed."
-    },
-    {
-      "date": "2026-10-03",
-      "note": "14:43 UTC: 57/200 done (28.5%) \u2014 ep54 1.8904, ep55 1.8806, ep56 1.8618, ep57 1.8502 all new lows; pace recovered ~2.2h/ep post-reboot; epoch58 step920 (~50%) RUNNING PID 935, RAM ~54%. 143/200 remaining."
-    },
-    {
-      "date": "2026-10-04",
-      "note": "03:37 UTC: 63/200 done (31.5%) \u2014 ep58 1.8445, ep59 1.8210, ep60 1.8214 (+0.0004 noise), ep61 1.7979 broke 1.80, ep62 1.7955, ep63 1.7723 NEW LOW; epoch64 step240 (~13%) RUNNING PID 935 23h, RAM ~50%. 137/200 remaining."
-    },
-    {
-      "date": "2026-10-04",
-      "note": "08:35 UTC: 65/200 done (32.5%) \u2014 ep64 1.7662, ep65 1.7636 NEW LOW but drops shrinking (-0.006/-0.003), plateau watch; epoch66 step500 (~27%) RUNNING PID 935 1d3h, RAM ~46%. 135/200 remaining."
-    },
-    {
-      "date": "2026-10-04",
-      "note": "15:35 UTC: 68/200 done (34%) \u2014 ep66 1.7497, ep67 1.7337, ep68 1.7199 NEW LOW; plateau scare RESOLVED (was noise, drops back to -0.014/-0.016); epoch69 step500 (~27%) RUNNING PID 935 1d10h, RAM ~53%. 132/200 remaining."
-    },
-    {
-      "date": "2026-10-05",
-      "note": "02:20 UTC: 72/200 done (36%) \u2014 ep69 1.7187, ep70 1.7104, ep71 1.6985, ep72 1.6741 NEW LOW (-0.024 biggest recent); epoch73 step1520 (~82%) RUNNING PID 935 1d21h, ckpt73 ~02:45. 128/200 remaining."
-    },
-    {
-      "date": "2026-10-05",
-      "note": "13:03 UTC: 76/200 done (38%) \u2014 ep73 1.6760, ep74 1.6614, ep75 1.6681 (+0.007 noise), ep76 1.6471 NEW LOW (-0.021); epoch77 step1840 (~99%) RUNNING PID 935 2d8h, ckpt77 ~13:15. 124/200 remaining."
-    },
-    {
-      "date": "2026-10-05",
-      "note": "15:05 UTC: 77/200 done (38.5%) \u2014 ep77 1.6364 NEW LOW (-0.011); epoch78 step1480 (~80%) RUNNING PID 935 2d10h, ckpt78 ~15:30. 123/200 remaining."
-    },
-    {
-      "date": "2026-10-06",
-      "note": "02:40 UTC: 82/200 done (41%) \u2014 ep78 1.6307, ep79 1.5366 OUTLIER (-0.094 best-ever), ep80 1.5888 bounce (+0.052), ep81 1.5893, ep82 1.5800 NEW LOW (ex-outlier); epoch83 step500 (~27%) RUNNING PID 935 2d22h. 118/200 remaining."
-    },
-    {
-      "date": "2026-10-06",
-      "note": "13:02 UTC: 83/200 done (41.5%) \u2014 ep83 1.5675 NEW LOW (-0.0125, ex-outlier trend clean); epoch84 step680 (~37%) RUNNING PID 935 3d1h, RAM ~50%. 117/200 remaining."
-    },
-    {
-      "date": "2026-10-07",
-      "note": "03:22 UTC: 87/200 done (43.5%) \u2014 ep84 1.5554, ep85 1.5422, ep86 1.5388, ep87 1.5361 NEW BEST-EVER (beats ep79 outlier 1.5366); epoch88 step1360 (~73%) RUNNING PID 935 3d15h, ckpt88 ~04:00. 113/200 remaining."
-    },
-    {
-      "date": "2026-10-07",
-      "note": "09:09 UTC: 89/200 done (44.5%) \u2014 ep88 1.5277 BEST-EVER (-0.008), ep89 1.5388 (+0.011 noise); epoch90 step620 (~33%) RUNNING PID 935 3d21h, ckpt90 ~10:00. 111/200 remaining."
-    },
-    {
-      "date": "2026-10-07",
-      "note": "13:02 UTC: 90/200 done (45%) \u2014 ep90 1.4535 BEST-EVER (-0.085 outlier watch like ep79 1.5366->bounce); epoch91 step540 (~29%) RUNNING PID 935 4d1h, ckpt91 ~15:15. 110/200 remaining."
-    },
-    {
-      "date": "2026-10-08",
-      "note": "03:02 UTC: 92/200 done (46%) \u2014 ep91 1.5075 bounce (+0.054 off ep90 outlier as predicted), ep92 1.4950 recovering (-0.0125); best-ever stays ep90 1.4535; epoch93 step320 (~17%) RUNNING PID 935 4d15h. 108/200 remaining."
-    },
-    {
-      "date": "2026-10-08",
-      "note": "13:41 UTC: still 92/200 (epoch93 99% step1840, ckpt93 imminent) \u2014 epoch93 SLOW ~12.5h vs 2.2h norm (swap 493MB, load 5.1, 5d thermal); training healthy, untouched. Watch 971 stuck 4d on kaggle pipe killed -> 47153 with timeout-20 guard, logging again. 108/200 remaining."
-    },
-    {
-      "date": "2026-10-08",
-      "note": "14:03 UTC: ckpt93 DONE 13:46 loss 1.4835 (-0.0115, best-ever stays ep90 1.4535 outlier), 93/200 done (46.5%). Epoch94 step20. SAFE TO REBOOT (resume from checkpoint_last.pt). 107/200 remaining."
-    },
-    {
-      "date": "2026-10-08",
-      "note": "2026-10-08 14:44 UTC: REBOOT (uptime 3min) killed PID935 at epoch94 step20; ckpt93 SAFE (loss 1.4835). RELAUNCHED PID937 epoch94/200 via -m module mode (script mode ImportError fixed), 320-341% CPU RSS ~1GB. Watch PID993 WEEK-MODE 300s (was 50s, 6x fewer wakeups/API calls). Fresh RAM 32% swap 0, pace should recover 2.5h/ep. 107 remaining, 1-week projection ~160-169/200 at 2.5h/ep. Kaggle OFF."
-    },
-    {
-      "date": "2026-10-09",
-      "note": "2026-10-09 02:42 UTC: 98/200 (49%) ckpt98 02:08, epoch99 step440 (~24%) RUNNING PID937 12h. Overnight pace steady ~2.25h/ep (94 17:09, 95 19:22, 96 21:37, 97 23:50, 98 02:08). Losses 1.8529/1.8494/1.8389/1.8366/1.8306 falling. Swap 407M watch, RAM healthy. Kaggle OFF."
-    },
-    {
-      "date": "2026-10-09",
-      "note": "2026-10-09 11:06 UTC: HALFWAY 102/200 (51%) ckpt102 11:00, epoch103 step60 RUNNING PID937 20h. Pace rock-steady ~2.2h/ep (99 04:25, 100 06:36, 101 08:48, 102 11:00). Losses 1.8202/1.8094(ep100 broke 1.81)/1.8138 noise/1.8069 new low. Swap 495M creep watch, RAM healthy RSS 869M. Kaggle OFF."
-    },
-    {
-      "date": "2026-10-09",
-      "note": "REBOOT RECOVERY 2026-10-09 12:14 UTC: system rebooted (uptime 2min), train was at ckpt102/200 (51%, loss 1.8069). Relaunched PID782 epoch103 resume auto lowram + watch PID812 (300s WEEK-MODE) + keepalive PID813 (auto-restart 300s). Plan: ~98ep left x2.2h = ~216h (~9d); 1 week reaches ~ep178, then ~2d more to 200. Kaggle stays OFF."
-    },
-    {
-      "date": "2026-10-09",
-      "note": "2026-10-09 reboot 15:43 (1wk run) -> resumed epoch104 PID833 nice10 lowram from ckpt103 (103/200 51.5% loss 1.7942), watch923+keepalive933 WEEK-MODE 300s, RAM 52% healthy, Kaggle OFF"
-    },
-    {
-      "date": "2026-10-13",
-      "note": "2026-10-13 INTENTIONAL REBOOT now (not waiting 136): ckpt135 done 05:59 loss 1.6695 (135/200 67.5%), abort epoch136 step460 (~1h loss accepted) to clear swap439M+opencode720M pressure, pace 2.2->3.5h/ep, expect ~2.3h after reboot"
-    },
-    {
-      "date": "2026-10-13",
-      "note": "07:10 UTC: trainer dead at epoch136 step520 (ckpt135 05:59 loss 1.6695, 135/200 67.5% ground truth, 135 ckpt files 79M). RAM 32%/2572MB swap 0 fresh. Relaunching WEEK-MODE nice10 + watch300s + keepalive300s for 1-week continuous. Kaggle OFF."
-    },
-    {
-      "date": "2026-10-13",
-      "note": "11:07 UTC: ckpt136 DONE loss 1.6666 NEW LOW (136/200 68%). STOPPED all (train 780 + watch 813 + keepalive 818) for user system restart. Pace was 3.4h/ep (thermal/swap/opencode pressure). Expect ~2.3h/ep fresh post-reboot. Resume epoch137."
-    },
-    {
-      "date": "2026-10-13",
-      "note": "11:33 UTC RELAUNCHED week-mode PID799 epoch137 from ckpt136 (loss 1.6666), fresh pace 4.5s/step ~2.3h/ep, watch866+keepalive867 300s. 64 left, ETA Oct19-20."
-    },
-    {
-      "date": "2026-10-13",
-      "note": "14:21 UTC ckpt137 DONE loss 1.6632 NEW LOW (137/200 68.5%), epoch138 running PID799 ~2.8h/ep. 63 left."
-    },
-    {
-      "date": "2026-10-14",
-      "note": "03:56 UTC ckpt142 DONE (142/200 71%), best ep140 1.5842 dip (outlier watch), ep141 1.6103 ep142 1.6285 recovering. Epoch143 step560 running ~2.4h/ep. 58 left."
-    },
-    {
-      "date": "2026-10-14",
-      "note": "09:43 UTC ckpt144 DONE (144/200 72%), ep143 1.6244, ep144 1.6410 uptick-watch (4ep sideways since ep140 dip; D healthy 0.78). Epoch145 step1080 ~2.4h/ep. 56 left."
-    },
-    {
-      "date": "2026-10-14",
-      "note": "11:17 UTC ckpt145 DONE (145/200 72.5%) 1.6318, D 0.7745 best-in-days; sideways band persists but recovering -> noise leaning. Epoch146 step300. 55 left."
-    },
-    {
-      "date": "2026-10-14",
-      "note": "15:55 UTC ckpt146 DONE (146/200 73%) 1.6365 (+0.005 sideways, 6ep band since ep140 dip 1.5842; D 0.7730 healthy). Epoch147 step120 running PID1203. 54 left."
-    },
-    {
-      "date": "2026-10-14",
-      "note": "18:10 UTC REBOOT ~17:59 killed PID1203+watch1272+keepalive1283 at epoch147 step1040 (~56%, train ran till 17:54, watch silent since 16:56). Truth 146/200 SAFE (146 ckpts + checkpoint_last.pt verified epoch145/loss 1.6365), only ~1.3h redo lost, no data/tracker loss. RELAUNCHED PID952 epoch147 from ckpt146 + watch1011 + keepalive1266 WEEK-MODE 300s; keepalive now also restarts watch (closes 1h blind gap). Step20 OK 329% CPU. 54 left."
-    },
-    {
-      "date": "2026-10-14",
-      "note": "18:30 UTC DOCS: push c5ea231 synced + guards green; token/auth map + reboot-relaunch order written to wiki/09-orchestration/SKILL.md (lesson: real file is ~/.github_pat not ~/.git_pat; credential helper wired reboot-safe). MEMORY Infra + TRACKER log point to it."
-    },
-    {
-      "date": "2026-10-15",
-      "note": "04:25 UTC overnight +4: ckpt147 1.5945 (dip toward ep140 best 1.5842) / 148 1.6239 / 149 1.6245 / 150 1.6307 DONE (150/200 75%, sideways band persists; D 0.7705 healthy). Epoch151 step600 (~32%) RUNNING PID952 10.3h, pace steady ~2.4h/ep. 50 left."
-    },
-    {
-      "date": "2026-10-15",
-      "note": "06:25 UTC ckpt151 DONE 1.6348 (151/200 75.5%, sideways band persists; D 0.7686 healthy). Epoch152 step280 (~15%) RUNNING PID952 12.3h ~2.4h/ep steady. 49 left."
-    },
-    {
-      "date": "2026-10-15",
-      "note": "09:18 UTC ckpt152 DONE 1.6178 (152/200 76%, -0.017 recovering, best move since ep147 dip; D 0.7685 healthy). Epoch153 step720 (~39%) RUNNING PID952 15.2h ~2.4h/ep steady. 48 left."
-    },
-    {
-      "date": "2026-10-15",
-      "note": "13:49 UTC ckpt153 1.5718 NEW BEST (beats ep140 1.5842!) / ckpt154 1.5997 bounce DONE (154/200 77%). Epoch155 step560 (~30%) RUNNING PID952 19.8h ~2.4h/ep steady. 46 left."
-    },
-    {
-      "date": "2026-10-15",
-      "note": "16:41 UTC ckpt155 DONE 1.6193 (155/200 77.5%, +0.020 uptick sideways; D 0.7683 healthy; best stays ep153 1.5718). Epoch156 step860 (~46%) RUNNING PID952 22.6h ~2.4h/ep steady, RAM 56-57%. 45 left."
-    },
-    {
-      "date": "2026-10-16",
-      "note": "03:56 UTC overnight +5: ckpt156 1.6144 / 157 1.6115 / 158 1.6112 / 159 1.6175 / 160 1.6095 DONE (160/200 80%, steady decline; D 0.7614 healthy; best stays ep153 1.5718). Epoch161 step740 (~40%) RUNNING PID952 33.9h ~2.4h/ep steady. 40 left."
-    },
-    {
-      "date": "2026-10-16",
-      "note": "05:23 UTC ckpt161 DONE 1.6073 (161/200 80.5%, decline continues; D 0.7594 healthy; best stays ep153 1.5718). Epoch162 step40 just started, RUNNING PID952 35.4h ~2.4h/ep steady. 39 left."
-    },
-    {
-      "date": "2026-10-16",
-      "note": "09:46 UTC ckpt162 DONE 1.6099 (162/200 81%, +0.003 flat noise; D 0.7769 healthy; best stays ep153 1.5718). Epoch163 step820 (~44%) RUNNING PID952 39.6h ~2.4h/ep steady, RAM 57-58%. 38 left."
-    },
-    {
-      "date": "2026-10-16",
-      "note": "12:23 UTC ckpt163 DONE 1.5685 NEW BEST (beats ep153 1.5718!; D 0.7802 healthy). Epoch164 step800 (~43%) RUNNING PID952 42.3h ~2.4h/ep steady, RAM 58-59%. 37 left."
-    },
-    {
-      "date": "2026-10-16",
-      "note": "16:07 UTC ckpt164 DONE 1.5975 (164/200 82%, +0.029 bounce off best as usual; D 0.7594 healthy; best stays ep163 1.5685). Epoch165 step1180 (~64%) RUNNING PID952 46h ~2.4h/ep steady, RAM 58-59%. 36 left."
-    },
-    {
-      "date": "2026-10-16",
-      "note": "17:16 UTC ckpt165 DONE 1.6031 (165/200 82.5%, +0.006 flat; D 0.7565 healthy; best stays ep163 1.5685). Epoch166 step80 just started, RUNNING PID952 47.2h ~2.4h/ep steady, RAM 58-61%. 35 left."
-    },
-    {
-      "date": "2026-10-17",
-      "note": "03:37 UTC overnight +3: ckpt166 (1.6039) / 167 (1.6199) / 168 (1.5934) DONE (168/200 84%, +0.013 since 163 best ep163 1.5685; D 0.7877 volatile). Epoch169 step40 just started, RUNNING PID952 4h ~2.4h/ep steady, RAM 56%"
-    },
-    {
-      "date": "2026-10-17",
-      "note": "05:00 UTC REBOOT RECOVERY: system reboot 04:52 killed PID952+watch1011+keepalive1266 mid-epoch169 step460 (~25%, ~0.6h redone). Ground truth SAFE 168/200 (168 ckpt files + checkpoint_last.pt verified epoch167/loss 1.5934), no data/tracker loss. RELAUNCHED PID1081 epoch169 resume-auto --optimize-for lowram (loaded ckpt168 start_epoch168) + watch1096 + keepalive1099 300s; fresh RAM 42%, CPU 318%. FIX: installed cron @reboot + */5 logs/boot_launch.sh idempotent supervisor so future reboots auto-recover without manual relaunch (no sudo/linger). 32 left -> finish ~Oct-19/20."
-    },
-    {
-      "date": "2026-10-17",
-      "note": "16:40 UTC post-reboot +4: ckpt169 1.5302 NEW BEST-EVER (beats ep163 1.5685 by -0.038, biggest drop in ~30ep) / 170 1.5849 bounce / 171 1.5957 / 172 1.5909 sideways (pre-drop pattern as after ep140/153/163). Epoch173 step1640 (~88%) RUNNING PID1081 11.6h, pace steady ~2.4h/ep, RAM 58%, reboot-guard holding (no loss since 05:00). 28 left -> finish ~Oct-20."
-    },
-    {
-      "date": "2026-10-18",
-      "note": "10:02 UTC 90% MILESTONE: ckpt178 1.5878 / 179 1.5906 / 180 1.5869 DONE (180/200 90%, sideways band 1.587-1.591 slowly easing; D 0.7487 healthy). Epoch181 step540 (~29%) RUNNING PID1081 1d5h stable uptime (no reboot), pace ~2.4h/ep, RAM 58%. 20 left -> finish ~Oct-20. Unpaired CycleGAN decision at ep200."
-    },
-    {
-      "date": "2026-10-18",
-      "note": "13:45 UTC ENGAGEMENT SHIPPED: GitHub Release v0.1.0 + prod promote live (GHCR :v0.1.0 + :latest on sha d36922c). Fixed cd-production: tag-push-only trigger + pinned checkout (release-event `fetch-tags:true` broke checkout 'Cannot fetch both <sha> and refs/tags/vX'); approved prod env via API; promote run 39131429427 SUCCESS. HF: model repo urbiologicalpa/he-dapi-translator (generator state_dict ep169) + FREE Static Space in-browser ONNX demo (Gradio Spaces need HF PRO now). Training PID1081 continuous, epoch181->182."
-    },
-    {
-      "date": "2026-10-18",
-      "note": "15:05 UTC PACKAGING SHIPPED: he-dapi v0.1.0 + napari-he-dapi v0.1.0 published to PyPI (uv publish, token at ~/.pypi_token). Library+CLI (he_dapi) and npe2 napari plugin, weights auto-pulled from HF. Tests added (packages/*/tests, tests/test_training_dummy.py @slow) + CI 'packages' job + manual/weekly training-smoke workflow. Training PID1081 unaffected."
+      "optimization": "staging image; corrected weights pending"
     }
   ],
   "next_actions": [
-    "WEEK-MODE running: train1081 epoch181->182 (best ep169 1.5302). Reboot-proof via cron.",
-    "kaggle STAND DOWN",
-    "PyPI DONE: pip install he-dapi ; pip install napari-he-dapi (v0.1.0). Bump version before republish.",
-    "~18 remaining @2.4h/ep -> finish ~Oct-20. Then v1.0 (backend+frontend) + launch.",
-    "TODO: rotate PyPI token (was shared in chat); configure trusted publishing to drop the token."
+    "Finish and archive the panCK ablation run",
+    "Build corrected 1024px HEMIT HDF5 and verify dapi == mihc[...,0]",
+    "Upload to private Kaggle dataset and run a 1-epoch T4 sanity check",
+    "Train corrected U-Net H&E -> DAPI baseline",
+    "Full 630/945 evaluation, then dual-branch implementation",
+    "Benchmark 512px tiled/INT8 CPU deployment"
   ],
-  "runs": {
-    "local": {
-      "status": "RUNNING",
-      "pid": 1081,
-      "command": "nice -n 10 env PYTHONPATH=. .venv/bin/python -u -m src.models.train_paired --config configs/hemit_dual_branch.yaml --resume auto --optimize-for lowram",
-      "log": "logs/train_paired.log",
-      "resume_from": "resources/models/checkpoints/he2dapi/checkpoint_epoch168.pt (epoch168 done)",
-      "current_epoch": 181,
-      "total_epochs": 200,
-      "started": "2026-10-17T05:00:31Z",
-      "supervisor": "logs/boot_launch.sh (cron @reboot + */5) -> logs/keepalive_week.sh (300s) -> train + watch",
-      "note": "2026-10-18 10:02 UTC: 180/200 (90%) done, best ep169 1.5302 NEW BEST-EVER; ep178-180 sideways 1.587-1.591 slowly easing. Epoch181 step540 (~29%) RUNNING PID1081 1d5h, watch1096 + keepalive1099, RAM 58%. No reboot/loss since 05:00. 20 left -> finish ~Oct-20."
-    },
-    "kaggle": {
-      "status": "CANCELLED_STAND_DOWN",
-      "kernel": "bikasash/he-dapi-product-gpu-train",
-      "kernel_version": 8,
-      "kernel_url": "https://www.kaggle.com/code/bikasash/he-dapi-product-gpu-train",
-      "payload_dir": "/tmp/kaggle_kernel_he_dapi",
-      "code_dataset_stage": ".tmp_kaggle_code (checkpoint_epoch14.pt + checkpoint_last.pt + code_bundle.zip, flat layout)",
-      "data_dataset": "bikasash/hemit-he-dapi-product-full",
-      "code_dataset": "bikasash/he-dapi-code-product",
-      "script": "he-dapi-product-gpu-train.py (newest-checkpoint resume + code_bundle unzip/merge + fail-fast guard)",
-      "auth": "token saved at ~/.kaggle/api_token (chmod 600), used via KAGGLE_API_TOKEN env; never in repo",
-      "post_mortem": "v8 log salvaged to /tmp/kaggle_out_v8d: NO GPU (torch 2.10.0+cpu, quota exhausted), trained ep15-18 on CPU ~2.8h/epoch (SLOWER than local 2.3h), G loss 2.2742->2.2094, cancelled during ep19. Fork BEHIND local (ep18 vs ep23) with HIGHER loss at same epochs -> discarded, local wins. DO NOT re-push until GPU quota refreshes (weekly).",
-      "fork_warning": "RESOLVED 2026-09-29: local fork won (ep23 vs ep18, loss 2.1516 vs 2.2094). Kaggle stays OFF."
-    },
-    "watch": {
-      "status": "RUNNING",
-      "script": "watch_runs.sh (300s WEEK-MODE)",
-      "pid_file": "logs/watch.pid",
-      "log": "logs/monitor.log",
-      "stop": "kill $(cat logs/watch.pid)",
-      "started": "2026-09-28T03:30Z"
-    },
-    "truth_rule": "progress.json:runs + TRACKER.md:Live Runs + MEMORY.md banner are the 3 synced copies; local ckpt files are ground truth for epoch count"
-  },
-  "tracker_version": "1.0",
-  "generated": "2026-10-13T07:00:53.588015Z",
-  "last_verified": "2026-10-18T15:05Z"
+  "daily_log": [
+    {
+      "date": "2026-10-20",
+      "note": "Fixed DAPI channel order (ch0); added 1024 builder and tests; Kaggle T4 confirmed; README/docs corrected to match implemented U-Net baseline; panCK ablation finishing."
+    }
+  ]
 }

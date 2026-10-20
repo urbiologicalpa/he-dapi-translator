@@ -134,7 +134,8 @@ class PairedHEMITDataset(Dataset):
                 dapi = h5f["dapi"][real_idx]  # HxW or HxWx3
             elif "mihc" in h5f:
                 mihc = h5f["mihc"][real_idx]
-                dapi = mihc[...,2] if mihc.ndim==3 else mihc
+                # HEMIT channel order is DAPI, CD3, panCK. DAPI is ch0.
+                dapi = mihc[...,0] if mihc.ndim==3 else mihc
             else:
                 dapi = h5f["he"][real_idx][...,0]  # fallback
             if dapi.ndim==3:

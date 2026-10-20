@@ -108,7 +108,7 @@ def enforce():
                 ok = False
         # code guards
         for path, needle in [
-            ("pack_hemit.py", "gc.collect()"),
+            ("scripts/data/pack_hemit.py", "gc.collect()"),
             ("src/utils/tiling.py", "merge_tiles_streaming"),
             ("src/utils/wsi_loader.py", "aszarr"),
             ("src/models/train_paired.py", "grad_accum"),

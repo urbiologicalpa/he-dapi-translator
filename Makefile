@@ -13,8 +13,8 @@ health:
 data:
 	@echo "=== Data extraction (streaming) ==="
 	@$(PY) -m src.utils.resource_monitor --check
-	@$(PY) pack_hemit.py 2>&1 | tee /tmp/pack_hemit.log
-	@$(PY) pack_bci.py 2>&1 | tee /tmp/pack_bci.log
+	@$(PY) scripts/data/pack_hemit.py 2>&1 | tee /tmp/pack_hemit.log
+	@$(PY) scripts/data/pack_bci.py 2>&1 | tee /tmp/pack_bci.log
 	@echo "[OK] data - check wiki/02-data-extraction/profile.json"
 
 train-paired-dummy:

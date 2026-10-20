@@ -39,14 +39,14 @@ def test_tiling_streaming():
         Path(p).unlink(missing_ok=True)
 
 def test_pack_hemit_streaming():
-    txt = Path("pack_hemit.py").read_text()
+    txt = Path("scripts/data/pack_hemit.py").read_text()
     assert "streaming" in txt.lower()
     assert "np.concatenate" not in txt or "streaming" in txt  # should not have naive concat without streaming alternative
     assert "ResourceMonitor" in txt
     assert "gc.collect()" in txt
 
 def test_pack_bci_streaming():
-    txt = Path("pack_bci.py").read_text()
+    txt = Path("scripts/data/pack_bci.py").read_text()
     assert "streaming" in txt.lower()
     assert "ResourceMonitor" in txt
 

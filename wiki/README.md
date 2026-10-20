@@ -38,7 +38,7 @@ python src/models/infer.py --input data/raw/wsi/*.svs --stream --out /tmp/out.ti
 ## Data Extraction Status (you asked "are we done ri8?")
 
 YES — Phase 1 DONE per `docs/DATA_EXTRACTION_REPORT.md:1` + verified Sep 6:
-- `hemit_train_512.h5` 3717 pairs (3.7G), `hemit_val` 630, `hemit_test` 945 — from `data/raw/hemit/extracted` 5292 tifs via `pack_hemit.py` (streaming, resumable)
+- `hemit_train_512.h5` 3717 pairs (3.7G), `hemit_val` 630, `hemit_test` 945 — from `data/raw/hemit/extracted` 5292 tifs via `scripts/data/pack_hemit.py` (streaming, resumable)
 - `maxpmx_*` 4192 pairs (fallback), `mhist_256/512` 3152 patches, `codex/monuseg` extras
 - Total `data/processed` 14G, `data/raw` ~72G (hemit 44G inside .7z)
-- Next optimization: `hemit_512.h5` combined (5.3G) was previously OOM via `np.concatenate` — now fixed to chunked `h5py` copy in `pack_hemit.py:86`
+- Next optimization: `hemit_512.h5` combined (5.3G) was previously OOM via `np.concatenate` — now fixed to chunked `h5py` copy in `scripts/data/pack_hemit.py:86`

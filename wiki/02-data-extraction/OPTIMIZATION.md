@@ -22,7 +22,7 @@
 ## How to re-run safely
 
 ```bash
-.venv/bin/python pack_hemit.py 2>&1 | tee /tmp/pack_hemit.log
+.venv/bin/python scripts/data/pack_hemit.py 2>&1 | tee /tmp/pack_hemit.log
 # watch RAM
 .venv/bin/python -m src.utils.resource_monitor --watch 30 &
 ```

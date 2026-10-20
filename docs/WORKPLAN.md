@@ -26,7 +26,7 @@ And BOTH user types: researchers + pathologists.
 **Since no own data, source internet:**
 
 Priority datasets (see `resources/datasets/README.md`):
-1. **HEMIT (MICCAI 2024)** - 4278 pairs, SAME slide, cellular-level aligned, H&E <-> DAPI/CD3/panCK, 1024x1024. BEST for paired training. Contact: ImmunoAIzer derived. ~3717/630/945 split. Use central 512x512 crop.
+1. **HEMIT (MICCAI 2024)** - 5,292 pairs (3,717/630/945), SAME slide, cellular-level aligned, H&E <-> DAPI/CD3/panCK, 1024x1024. BEST for paired training. Contact: ImmunoAIzer derived. Use central 512x512 crop only for the legacy CPU baseline; corrected DAPI training uses native 1024.
 2. **BCI (Breast HER2)** - consecutive sections, not aligned -> for unpaired test.
 3. **CODEX Virtual H&E examples (PMC8721868)** - DAPI + Eosin -> virtual H&E, has code + example data.
 4. **Autofluorescence -> H&E Lung (medRxiv 2024)** - mIF panel includes DAPI.
@@ -44,7 +44,7 @@ Train BOTH directions as separate models (not one bijective model):
 
 **Track A: H&E -> DAPI (easier, segmentation task)**
 - Baseline 1: Pix2Pix (U-Net generator + PatchGAN) -> L1 + cGAN + SSIM + DISTS loss (per 2024 FLIM paper)
-- Baseline 2: Dual-branch Pix2Pix (CNN + Swin Transformer + FMF) from HEMIT paper -> SOTA 0.875 SSIM, 29.88 PSNR
+- Baseline 2: Dual-branch Pix2Pix (CNN + Swin Transformer + FMF) from HEMIT paper -> DAPI-branch paper targets 0.815 SSIM / 0.716 Pearson / 28.610 dB PSNR (not composite mIHC numbers)
 - Stretch: D-VST Diffusion Transformer (NeurIPS 2025) - tone-controllable, pathology-correct
 
 **Track B: DAPI -> H&E (harder, generative)**

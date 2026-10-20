@@ -6,16 +6,16 @@ Date: 2026-09-19 | Machine: Intel i5-10210U 8 vCPU, 3.7GB RAM +1GB swap, no GPU,
 
 Verification Sep 19:
 - `data/raw/hemit/extracted/{train,val,test}/{input,label}/*.tif` → 5292 pairs (3717/630/945) confirmed `ls -R data/raw/hemit | wc -l` ~5300.
-- `data/processed/hemit_train_512.h5` 3.7G (3717), `hemit_val_512.h5` 684M (630), `hemit_test_512.h5` 968M (945) — via `pack_hemit.py` resumable (skip if `he.shape[0]==len(pairs)`).
+- `data/processed/hemit_train_512.h5` 3.7G (3717), `hemit_val_512.h5` 684M (630), `hemit_test_512.h5` 968M (945) — via `scripts/data/pack_hemit.py` resumable (skip if `he.shape[0]==len(pairs)`).
 - `data/processed/maxpmx_*` 4192 fallback, `mhist_256.h5` 498M + `mhist_512.h5` 1.9G (3152 MHIST), `codex_512.h5`, `monuseg_256.h5`, `data/raw/wsi/CMU-1.svs` example.
-- Previous crash cause: `pack_hemit.py:86-107` naive `np.concatenate` required 10.6GB → OOM kill. Fixed Sep 19 to streaming chunked copy (peak 140MB).
+- Previous crash cause: `scripts/data/pack_hemit.py:86-107` naive `np.concatenate` required 10.6GB → OOM kill. Fixed Sep 19 to streaming chunked copy (peak 140MB).
 
 ## Crash Root Cause & Spike Map
 
 | Step | Before Peak | After Peak | Fix | Doc |
 |------|-------------|------------|-----|-----|
 | HEMIT combined 5292 | 10.6GB → killed | 140MB | chunked `h5py` copy B=100, `gc.collect`, `ResourceMonitor` | `wiki/02-data-extraction/SKILL.md:1` |
-| BCI combined 9681 | 9GB → killed | 150MB | same streaming | `pack_bci.py:1` |
+| BCI combined 9681 | 9GB → killed | 150MB | same streaming | `scripts/data/pack_bci.py:1` |
 | WSI canvas 20k²×3 float32 | 6.4GB (canvas+weight) | <512MB memmap bands | `merge_tiles_streaming` to tiled TIFF | `wiki/04-tiling/SKILL.md:1` |
 | WSI load `asarray()` | 4.8GB | 0 (zarr slice) | `series.aszarr()` + level downsample | `wiki/05-wsi-loader/SKILL.md:1` |
 | Train batch 8 + VGG | 1.2GB + 0.5GB VGG | 18MB (batch2+accum4) | `batch_size 2, grad_accum 4, dists_on_cpu false, num_workers 0` | `wiki/06-training/SKILL.md:1` |
@@ -52,7 +52,7 @@ PYTHONPATH=. .venv/bin/python tests/test_resource_guards.py  # 11 passed
 .venv/bin/python src/models/infer.py --input data/examples/he_example.png --direction he2dapi --out /tmp/synth.png
 .venv/bin/python src/models/infer.py --input data/examples/he_example.png --direction he2dapi --out /tmp/synth.tiff --stream
 # Makefile
-.venv/bin/python pack_hemit.py  # SKIPs train/val/test, streams combined (<200MB)
+.venv/bin/python scripts/data/pack_hemit.py  # SKIPs train/val/test, streams combined (<200MB)
 ```
 
 ## How to Run Next (resumable, no crash)
@@ -62,7 +62,7 @@ PYTHONPATH=. .venv/bin/python tests/test_resource_guards.py  # 11 passed
 PYTHONPATH=. .venv/bin/python -m src.utils.resource_monitor --check
 
 # 2. Data (already done, but re-runnable safe)
-PYTHONPATH=. .venv/bin/python pack_hemit.py 2>&1 | tee /tmp/pack_hemit.log
+PYTHONPATH=. .venv/bin/python scripts/data/pack_hemit.py 2>&1 | tee /tmp/pack_hemit.log
 
 # 3. Training (CPU low-RAM)
 PYTHONPATH=. .venv/bin/python src/models/train_paired.py --config configs/hemit_dual_branch.yaml --dummy --optimize-for lowram
