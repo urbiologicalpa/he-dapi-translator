@@ -8,6 +8,7 @@ Run:
   python src/models/train_paired.py --config configs/hemit_dual_branch.yaml
 """
 import argparse
+import time
 import yaml
 from pathlib import Path
 import torch
@@ -373,6 +374,13 @@ def main():
             print(f"[ONNX] Exported -> {onnx_path}")
         except Exception as e:
             print(f"[ONNX] Export failed: {e}")
+
+    # completion flag: tells cron/keepalive not to relaunch a finished run
+    if not args.dummy:
+        flag = Path("logs/train_done.flag")
+        flag.parent.mkdir(parents=True, exist_ok=True)
+        flag.write_text(f"finished {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())} epochs={epochs}\n")
+        print(f"[DONE] Training complete -> {flag}")
 
 if __name__=="__main__":
     main()

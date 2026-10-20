@@ -49,7 +49,7 @@ training:
   checkpoint_dir: resources/models/checkpoints/he2dapi
   save_every: 1  # resumable: checkpoint every N epochs (atomic + checkpoint_last.pt)
   resume: auto  # auto-resume from checkpoint_last.pt if exists
-  export_onnx: true
+  export_onnx: false  # exported separately after training: python -m src.models.export_onnx (avoids 3.7GB OOM at finish)
   oom_guard: true  # halve batch if RAM >80%
   max_cache_mb: 4  # h5 chunk cache
 
