@@ -1,9 +1,17 @@
 # he-dapi-translator Dockerfile
 # Build: docker build -t he-dapi-translator -f docker/Dockerfile .
-# Run: docker run -p 8000:8000 -p 3000:3000 he-dapi-translator
-# Push: docker tag he-dapi-translator <user>/he-dapi-translator:latest && docker push <user>/he-dapi-translator:latest
+# Run: docker run -p 8000:8000 -v $PWD/resources/models/checkpoints:/app/resources/models/checkpoints:ro he-dapi-translator
 
-FROM python:3.10-slim AS base
+# 1) Frontend build (React + Vite -> static dist served by FastAPI)
+FROM node:24-slim AS frontend-build
+WORKDIR /app/src/frontend
+COPY src/frontend/package.json src/frontend/package-lock.json ./
+RUN npm ci
+COPY src/frontend/ ./
+RUN npm run build
+
+# 2) Backend runtime
+FROM python:3.10-slim
 LABEL org.opencontainers.image.title="he-dapi-translator" \
       org.opencontainers.image.description="Bidirectional H&E<->DAPI virtual staining (Pix2Pix + CycleGAN), patch + WSI" \
       org.opencontainers.image.source="https://github.com/urbiologicalpa/he-dapi-translator" \
@@ -21,21 +29,14 @@ WORKDIR /app
 COPY docker/requirements.txt /app/docker/requirements.txt
 RUN pip install --no-cache-dir -r docker/requirements.txt
 
-# Copy source
+# Copy source + built frontend
 COPY src/ /app/src/
 COPY resources/ /app/resources/
 COPY data/examples/ /app/data/examples/
+COPY --from=frontend-build /app/src/frontend/dist /app/src/frontend/dist
 
-# Frontend build (if Node frontend exists)
-# Uncomment when frontend added:
-# FROM node:20-slim AS frontend-build
-# WORKDIR /app/src/frontend
-# COPY src/frontend/package.json ./
-# RUN npm install && npm run build
-# COPY --from=frontend-build /app/src/frontend/dist /app/src/frontend/dist
-
-# Runtime
-EXPOSE 8000 3000
+# Weights are mounted at runtime (not baked in): -v .../checkpoints:/app/resources/models/checkpoints:ro
+EXPOSE 8000
 CMD ["uvicorn", "src.backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 # Healthcheck

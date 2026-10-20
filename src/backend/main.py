@@ -141,3 +141,9 @@ async def translate(file: UploadFile = File(...), direction: str = "he2dapi"):
 async def translate_wsi(file: UploadFile = File(...), direction: str = "he2dapi"):
     # Same as /translate but explicit WSI flag (supports .svs via WSILoader)
     return await translate(file, direction)
+
+# Serve the built frontend (src/frontend/dist) when present.
+_FRONTEND_DIST = Path(__file__).resolve().parents[1] / "frontend" / "dist"
+if _FRONTEND_DIST.exists():
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=str(_FRONTEND_DIST), html=True), name="frontend")

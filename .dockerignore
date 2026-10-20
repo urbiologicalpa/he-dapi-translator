@@ -10,6 +10,8 @@
 .pytest_cache/
 __pycache__/
 *.pyc
+src/frontend/node_modules/
+src/frontend/dist/
 
 # secrets / local only
 private/

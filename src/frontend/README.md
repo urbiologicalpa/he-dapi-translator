@@ -1,24 +1,55 @@
-# src/frontend - React Drag & Drop UI
+# src/frontend — React Drag & Drop UI
 
-Stack: React + Vite + react-dropzone + OpenSeadragon (WSI viewer) + slider compare
+Stack: React 19 + Vite + react-dropzone + OpenSeadragon + compare slider.
 
-Quick start (after npm init):
-```
+## Quick start
+
+```bash
+# Node 24 LTS (installed via nvm on this box)
+export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" && nvm use --lts
+
 cd src/frontend
 npm install
-npm run dev  # -> http://localhost:3000
+npm run dev          # http://localhost:3000 (proxies API to :8000)
 ```
 
-Features (per WORKPLAN Phase 3):
-- Dropzone: .png .tiff .svs .ome.tiff
-- Direction toggle: H&E->DAPI / DAPI->H&E
-- Model selector: fast (Pix2Pix) vs quality (Diffusion stub)
-- Result: side-by-side slider, download TIFF, watermark SYNTHETIC
-- WSI viewer: OpenSeadragon tiled view + overlay confidence heatmap
+Backend must be running on port 8000:
 
-Backend proxy: vite.config.js proxies /translate -> http://localhost:8000
-
-Stub until React scaffold is created - backend alone works via curl:
+```bash
+PYTHONPATH=. .venv/bin/uvicorn src.backend.main:app --host 0.0.0.0 --port 8000
 ```
-curl -X POST -F "file=@data/examples/he_example.png" -F "direction=he2dapi" http://localhost:8000/translate --output /tmp/out.png
+
+## Production build
+
+```bash
+npm run build        # -> src/frontend/dist
+```
+
+The FastAPI backend serves `src/frontend/dist` automatically when it exists
+(`http://localhost:8000/`), and the Docker image builds it in a Node stage.
+
+## Features
+
+- Dropzone: `.png .jpg .tiff .svs .ome.tiff` (max 500 MB upload)
+- Direction toggle: H&E → DAPI / DAPI → H&E
+- Compare slider (input vs synthetic) + `SYNTHETIC` watermark
+- Download PNG
+- Whole-slide viewer (OpenSeadragon, lazy-loaded chunk): scroll to zoom, drag to pan
+- Backend health badge
+
+## Backend API
+
+`direction` is a query parameter:
+
+```bash
+curl -X POST -F "file=@data/examples/he_example.png" \
+  "http://localhost:8000/translate?direction=he2dapi" --output /tmp/out.png
+```
+
+## Docker Compose
+
+From the repo root:
+
+```bash
+docker compose up --build      # backend :8000 (built UI + API), frontend dev :3000
 ```
