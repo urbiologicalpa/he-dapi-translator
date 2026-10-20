@@ -71,27 +71,73 @@ Every stage profiled with `src/utils/resource_monitor.py`, every spike fixed by 
 
 A Kaggle T4 offload was attempted, measured (CPU-only quota, 2.8h/ep — *slower* than local), and stood down with a written post-mortem instead of sunk cost. Process notes: [`wiki/`](wiki/) (9 optimization tracks), [`docs/optimization/REPORT.md`](docs/optimization/REPORT.md).
 
-## Quick start
+## Quickstart
 
-```bash
-# env (CPU)
-uv pip install --python .venv/bin/python torch torchvision --index-url https://download.pytorch.org/whl/cpu
-uv pip install -r docker/requirements.txt  # or: pip install -e ".[lowram]"
+### Option A: Run locally with Python
 
-# inference (patch + streaming WSI)
-PYTHONPATH=. .venv/bin/python src/models/infer.py --input data/examples/he_example.png --direction he2dapi --out /tmp/synth.png
-PYTHONPATH=. .venv/bin/python src/models/infer.py --input data/raw/wsi/CMU-1.svs --direction he2dapi --wsi --stream --out /tmp/wsi.tiff
+**Requirements:** Python 3.10 and Git. The CPU installation below is intended for a compatible Windows or Linux environment.
 
-# training (resumable — safe to kill and rerun)
-PYTHONPATH=. .venv/bin/python -m src.models.train_paired --config configs/hemit_dual_branch.yaml --resume auto --optimize-for lowram
+1. Create and activate a virtual environment.
 
-# tracker + guards
-PYTHONPATH=. .venv/bin/python -m src.utils.progress_tracker --check
-PYTHONPATH=. .venv/bin/python -m src.utils.progress_tracker --enforce
-PYTHONPATH=. .venv/bin/python tests/test_resource_guards.py
+**Windows PowerShell**
+
+```powershell
+py -3.10 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
-Docker: `docker build -t he-dapi-translator -f docker/Dockerfile .` (see [`docker/`](docker/)). Staging image published to `ghcr.io/urbiologicalpa/he-dapi-translator:staging`.
+**Linux/macOS**
+
+```bash
+python3.10 -m venv .venv
+source .venv/bin/activate
+```
+
+2. Install the pinned dependencies using the CPU-only PyTorch wheel index.
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r docker/requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+```
+
+3. Verify the installation.
+
+```bash
+python -c "import torch, torchvision; print('PyTorch:', torch.__version__); print('Torchvision:', torchvision.__version__)"
+python -m pip check
+```
+
+### Option B: Run with Docker
+
+**Requirements:** Docker Engine or Docker Desktop.
+
+Build the image from the repository root:
+
+```bash
+docker build -t he-dapi-translator -f docker/Dockerfile .
+```
+
+Alternatively, use the provided Compose configuration:
+
+```bash
+docker compose -f docker/docker-compose.yml up --build
+```
+
+Use `docker compose -f docker/docker-compose.yml down` to stop the Compose services.
+
+### Training, tracking, and regression checks
+
+The following commands are for Linux/macOS shells with the virtual environment activated. They assume the configuration and training data are available.
+
+```bash
+PYTHONPATH=. python -m src.models.train_paired --config configs/hemit_dual_branch.yaml --resume auto --optimize-for lowram
+
+python -m src.utils.progress_tracker --check
+python -m src.utils.progress_tracker --enforce
+python -m pytest tests/test_resource_guards.py
+```
+
+These commands do not download or prepare training datasets automatically. Check the configuration and dataset paths before starting training.
 
 ## Layout
 
