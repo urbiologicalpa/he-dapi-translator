@@ -66,7 +66,7 @@ class PairedHEMITDataset(Dataset):
                     # verify patch_size matches file
                     file_patch = f.attrs.get("patch_size", patch_size)
                     if file_patch != patch_size:
-                        print(f"[WARN] Requested patch {patch_size} != file patch {file_patch}, will resize on load (costly). Prefer matching config.")
+                        print(f"[WARN] Requested patch {patch_size} != file patch {file_patch}, will center-crop/resize on load. Prefer matching config.")
             else:
                 # npz fallback
                 data = np.load(h5_path)

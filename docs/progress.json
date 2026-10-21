@@ -1,7 +1,7 @@
 {
   "project": "he-dapi-translator",
-  "updated": "2026-10-21T08:10:00Z",
-  "status": "alpha; panCK ablation complete; corrected 1024 H5 built; DAPI training queued on Kaggle",
+  "updated": "2026-10-21T08:35:00Z",
+  "status": "alpha; panCK ablation complete; corrected 1024 H5 built; Kaggle smoke passed; DAPI pretrain next",
   "overall_percent": 50,
   "machine": {
     "cpu": "Intel i5-10210U 8vCPU 4c/8t",
@@ -126,9 +126,9 @@
     }
   ],
   "kaggle": {
-    "checked_utc": "2026-10-21T08:10:00Z",
-    "dapi_job": "not_started",
-    "reason": "data dataset creation/verification in progress; code dataset and smoke job pending",
+    "checked_utc": "2026-10-21T08:35:00Z",
+    "dapi_job": "smoke_complete",
+    "reason": "pretrain not launched yet",
     "gpu_remaining_hours": 29.99,
     "quota_refresh": "2026-10-24T00:00:00",
     "old_kernels": [
@@ -136,6 +136,12 @@
       "bikasash/he-dapi-full-val",
       "bikasash/he-dapi-gpu-probe2"
     ],
-    "runbook": "docs/KAGGLE_DAPI.md"
+    "runbook": "docs/KAGGLE_DAPI.md",
+    "smoke": {
+      "status": "complete",
+      "step_seconds_512": 1.96,
+      "batch": 2,
+      "note": "20 steps in ~39s; 40-epoch plan replaced by 20 epochs + 1024 fine-tune"
+    }
   }
 }

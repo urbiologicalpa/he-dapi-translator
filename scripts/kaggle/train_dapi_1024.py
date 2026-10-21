@@ -3,8 +3,8 @@
 
 Stages (set DAPI_STAGE):
   smoke     - 1 epoch / 20 steps at 512, timing only
-  pretrain  - 40 epochs at 512 from the 1024px Macenko HDF5
-  finetune  - 20 epochs at 1024 from the 512 checkpoint
+  pretrain  - 20 epochs at 512 from the 1024px Macenko HDF5
+  finetune  - 2 x 500 steps at 1024 from the 512 checkpoint
 
 Attach:
   bikasash/hemit-dapi-1024-ch0-macenko
@@ -141,7 +141,7 @@ def main() -> None:
         if incoming and not any(ckpt_dir.glob("checkpoint_*.pt")):
             shutil.copy2(incoming, ckpt_dir / "checkpoint_last.pt")
             print(f"resume checkpoint {incoming} -> {ckpt_dir}")
-        extra = ["--resume", "auto"]
+        extra = ["--resume", "auto", "--epochs", "20"]
     else:
         config = ROOT / "configs/hemit_dapi_1024.yaml"
         seed = CKPT_ROOT / "dapi_pretrain/checkpoint_last.pt"
@@ -154,11 +154,11 @@ def main() -> None:
             shutil.copy2(seed, ckpt_dir / "checkpoint_last.pt")
             print(f"initialized 1024 from {seed}")
             if restart:
-                extra = ["--resume", str(ckpt_dir / "checkpoint_last.pt"), "--resume-epoch", "0"]
+                extra = ["--resume", str(ckpt_dir / "checkpoint_last.pt"), "--resume-epoch", "0", "--epochs", "2", "--max-steps", "500"]
             else:
                 extra = ["--resume", "auto"]
         else:
-            extra = ["--resume", "auto"]
+            extra = ["--resume", "auto", "--epochs", "2", "--max-steps", "500"]
 
     cmd = [
         sys.executable, "-u", "-m", "src.models.train_paired",

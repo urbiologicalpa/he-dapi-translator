@@ -21,8 +21,8 @@ used `ch2` as the target. Consequences:
 | Run | Status | Details |
 |---|---|---|
 | Local CPU, 512px | **Complete** | Epoch 200 finished 2026-10-20 19:34 UTC; full 630/945 panCK eval recorded. Do not treat as DAPI. |
-| Kaggle T4 | Data upload in progress | 2× Tesla T4 15.64 GB. 29.99h remaining; resets 2026-10-24. New DAPI dataset is processing; no DAPI job yet. |
-| Corrected 1024px DAPI | Data ready | `hemit_*_1024.h5` built and verified; upload/smoke/training next. |
+| Kaggle T4 | Smoke passed; pretrain next | 2× Tesla T4 15.64 GB. 29.99h remaining; resets 2026-10-24. Smoke: ~1.96 s/step at 512. |
+| Corrected 1024px DAPI | Ready to pretrain | Data + code datasets ready; 20-epoch 512 pretrain, then 2×500-step 1024 fine-tune. |
 | DAPI → H&E | Not started | Trainer is a smoke-test skeleton; no real weights. |
 
 ## Phases
@@ -42,13 +42,12 @@ progress.
 
 ## Next actions
 
-1. Verify the private Kaggle data dataset contains train/val/test.
-2. Upload the code dataset and run the 512px smoke test; record seconds/step + VRAM.
-3. Pretrain 40 epochs at 512, then fine-tune 20 epochs at 1024 with resume.
-4. Evaluate full 630 val + 945 test; publish DAPI metrics with the target channel.
-5. Implement/vendor the dual-branch Swin-T + FMF generator.
-6. Train reverse DAPI → H&E, then add a direction router for one plugin/API.
-7. Benchmark 512px tiled/INT8 deployment on the 3.7 GB box.
+1. Run 20-epoch 512 pretrain on Kaggle, resuming across sessions.
+2. Fine-tune 2×500 steps at 1024 from the 512 checkpoint.
+3. Evaluate full 630 val + 945 test; publish DAPI metrics with the target channel.
+4. Implement/vendor the dual-branch Swin-T + FMF generator.
+5. Train reverse DAPI → H&E, then add a direction router for one plugin/API.
+6. Benchmark 512px tiled/INT8 deployment on the 3.7 GB box.
 
 ## Commands
 

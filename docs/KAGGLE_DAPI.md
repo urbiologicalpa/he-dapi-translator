@@ -1,6 +1,6 @@
 # Kaggle DAPI runbook and status
 
-Last checked: **2026-10-21 08:10 UTC**
+Last checked: **2026-10-21 08:35 UTC**
 
 ## Current status
 
@@ -9,18 +9,25 @@ Last checked: **2026-10-21 08:10 UTC**
   - train 11.5 GB, 3,717 pairs
   - val 2.1 GB, 630 pairs
   - test 3.0 GB, 945 pairs
-- Private data dataset `bikasash/hemit-dapi-1024-ch0-macenko` was created; it is
-  still processing/verifying. Confirm all three files before launching GPU.
-- Code dataset and smoke kernel are next.
+- Private data datasets:
+  - `bikasash/hemit-dapi-1024-ch0-macenko` — train + val ready
+  - `bikasash/hemit-dapi-1024-ch0-test` — test split (separate, processing)
+- Code dataset `bikasash/he-dapi-code-dapi-1024` is ready.
+- Smoke kernel `bikasash/he-dapi-dapi-1024-corrected` passed:
+  - T4, torch 2.11.0+cu128
+  - 20 steps in ~39s at 512px, batch 2: **~1.96 s/step, ~1 sample/s**
+  - ~61 min/epoch at 3,717 samples
+- **40 epochs at 512 is not feasible.** Revised target: 20 epochs, split across
+  sessions with checkpoint resume, then 2×500 steps at 1024.
 - GPU quota: **29.99h remaining**, refresh `2026-10-24T00:00:00`.
 
 ## Why the run is staged
 
 A 100-epoch, native-1024px run is not realistic on a 30h T4 quota. Plan:
 
-1. **Smoke** — 1 epoch, 20 steps at 512, measure step time/VRAM.
-2. **Pretrain** — 40 epochs at 512 using the 1024px Macenko H5 (center-cropped).
-3. **Fine-tune** — 20 epochs at native 1024 from the 512 checkpoint.
+1. **Smoke** — done: ~1.96 s/step at 512, batch 2.
+2. **Pretrain** — 20 epochs at 512; likely 12h + resume session.
+3. **Fine-tune** — 2×500 steps at native 1024 from the 512 checkpoint.
 4. **Evaluate** — full 630 val + 945 test at 1024; save labeled metrics.
 
 If the smoke run is too slow, stop and reduce the stage targets rather than burn
@@ -137,9 +144,9 @@ state-dict fallback before evaluating.
 |---|---|---|
 | Local panCK epoch 200 | done | full 630/945 len eval recorded |
 | Build 1024 H5 | done | train 11.5 GB, val 2.1 GB, test 3.0 GB |
-| Upload data dataset | processing | confirm all 3 files |
-| Upload code dataset | pending | after commit |
-| Kaggle smoke | pending | measure sec/step |
-| 512 pretrain | pending | 40 epochs target |
-| 1024 fine-tune | pending | 20 epochs target |
+| Upload data dataset | ready (train/val) | test split in separate dataset |
+| Upload code dataset | ready | nested `code_bundle/` mount handled |
+| Kaggle smoke | **done** | ~1.96 s/step at 512, batch 2 |
+| 512 pretrain | running/next | 20 epochs, resume across sessions |
+| 1024 fine-tune | pending | 2×500 steps |
 | Full val/test eval | pending | 630 / 945 |

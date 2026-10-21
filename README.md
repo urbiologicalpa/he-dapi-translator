@@ -47,7 +47,7 @@ one-way H&E → DAPI paper reproduction.
 |---|---|---|
 | Bidirectional plugin / one workflow | **Not available** | UI/API routing scaffold exists; reverse model is untrained, so this is not yet a bidirectional product |
 | H&E → panCK ablation | **Complete / archived** | 200 epochs, full 630/945 evaluation; used only to validate the pipeline |
-| H&E → DAPI | **Not trained yet** | Corrected 1024px H5 is built and verified; Kaggle upload/smoke/training queued |
+| H&E → DAPI | **Not trained yet** | Corrected 1024px H5 ready; Kaggle smoke passed; DAPI pretrain next |
 | DAPI → H&E | **Not available** | The CycleGAN trainer is a smoke-test skeleton; no real weights |
 | Dual-branch Swin + FMF | **Not implemented** | `train_paired.py` currently builds the U-Net baseline |
 | Data pipeline | **Implemented** | HEMIT 5,292 pairs; corrected 1024px H5 built for train/val/test |

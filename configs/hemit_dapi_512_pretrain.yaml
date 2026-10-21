@@ -27,7 +27,7 @@ model:
     nuclei_aux_weight: 0.0
 
 training:
-  epochs: 40
+  epochs: 20
   batch_size: 4
   grad_accum: 2
   num_workers: 2
