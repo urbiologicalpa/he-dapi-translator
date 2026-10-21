@@ -1,0 +1,19 @@
+{
+  "checkpoint": "resources/models/checkpoints/he2dapi/checkpoint_epoch200.pt",
+  "file_epoch": 200,
+  "split": "val",
+  "resolution": 512,
+  "n": 630,
+  "train_G_loss": 1.5796,
+  "val_L1": 0.0252,
+  "val_PSNR_dB": 29.23,
+  "val_SSIM": 0.7389,
+  "val_Pearson": 0.5072,
+  "val_SSIM_loss_proxy": 0.1497,
+  "val_Dice_thresh01": 0.1526,
+  "val_D_loss": 0.8012,
+  "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
+  "evaluated": "2026-10-21T04:41:36.478495+00:00",
+  "label": "panck-ch2-512-epoch200",
+  "target": "panCK ch2 ablation"
+}

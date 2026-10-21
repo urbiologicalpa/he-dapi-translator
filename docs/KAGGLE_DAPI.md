@@ -1,20 +1,18 @@
 # Kaggle DAPI runbook and status
 
-Last checked: **2026-10-20 17:50 UTC**
+Last checked: **2026-10-21 08:10 UTC**
 
 ## Current status
 
-- **No corrected DAPI job exists on Kaggle yet.**
-- Existing kernels are the old panCK ablation/probes:
-  - `bikasash/he-dapi-product-gpu-train` — `CANCEL_ACKNOWLEDGED`
-  - `bikasash/he-dapi-full-val` — `COMPLETE`
-  - `bikasash/he-dapi-gpu-probe2` — `COMPLETE`
-- Existing datasets are old 512px products:
-  - `bikasash/hemit-he-dapi-product-full`
-  - `bikasash/hemit-he-dapi-small-4g`
-  - `bikasash/he-dapi-code-product`
+- **No corrected DAPI training job exists on Kaggle yet.**
+- Corrected `hemit_*_1024.h5` is built and verified locally:
+  - train 11.5 GB, 3,717 pairs
+  - val 2.1 GB, 630 pairs
+  - test 3.0 GB, 945 pairs
+- Private data dataset `bikasash/hemit-dapi-1024-ch0-macenko` was created; it is
+  still processing/verifying. Confirm all three files before launching GPU.
+- Code dataset and smoke kernel are next.
 - GPU quota: **29.99h remaining**, refresh `2026-10-24T00:00:00`.
-- Blocker: corrected `hemit_*_1024.h5` has not been built/uploaded yet.
 
 ## Why the run is staged
 
@@ -137,9 +135,9 @@ state-dict fallback before evaluating.
 
 | Stage | Status | Notes |
 |---|---|---|
-| Local panCK epoch 200 | running | ETA ~19:45–20:00 UTC |
-| Build 1024 H5 | pending | after epoch 200 |
-| Upload data dataset | pending | private |
+| Local panCK epoch 200 | done | full 630/945 len eval recorded |
+| Build 1024 H5 | done | train 11.5 GB, val 2.1 GB, test 3.0 GB |
+| Upload data dataset | processing | confirm all 3 files |
 | Upload code dataset | pending | after commit |
 | Kaggle smoke | pending | measure sec/step |
 | 512 pretrain | pending | 40 epochs target |

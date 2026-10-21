@@ -70,23 +70,22 @@ Metrics (see `resources/models/README.md`):
 
 ### Phase 2.5 — Benchmark & release gates (after epoch 200)
 
-**What ships after the 200-epoch run:** an **ablation benchmark release**, not a
-DAPI model. The run is H&E -> panCK because of the old channel bug. Shipping it
-as DAPI would be false.
+**What ships after the 200-epoch run:** an **internal ablation benchmark**, not a
+DAPI model and not a tagged product release. The run is H&E -> panCK because of
+the old channel bug. Shipping it as DAPI would be false.
 
 Deliverables:
 
-- [ ] Archive `checkpoint_epoch200.pt`, `generator_last.pt`, config, git SHA and
-      checkpoint hash under the ablation record.
-- [ ] Run full panCK evaluation on **630 val + 945 test** using the legacy 512px
-      H5; write `docs/metrics_panck_512.json` (not `docs/metrics_eval.json`).
-- [ ] Fill `docs/BENCHMARK.md` with measured panCK numbers, clearly labeled.
-- [ ] Tag/publish **v0.1.2-ablation** (or a GitHub pre-release) with:
-      README/model card correction, benchmark tables, corrected 1024px data
-      builder, and "not DAPI" notice. Do not publish a DAPI claim.
-- [ ] Keep PyPI/HF weights labeled as the ablation until corrected DAPI weights
+- [x] Archive `checkpoint_epoch200.pt`, `generator_last.pt`, config, git SHA and
+      checkpoint hash in `docs/ABLATION_PANCK.md`.
+- [x] Run full panCK evaluation on **630 val + 945 test** using the legacy 512px
+      H5; write `docs/metrics_panck_512.json`.
+- [x] Fill `docs/BENCHMARK.md` with measured panCK numbers, clearly labeled.
+- [x] Keep weights internal; publish only the engineering note and metrics in
+      git. Do not tag a model release or publish a DAPI claim.
+- [x] Keep PyPI/HF weights labeled as the ablation until corrected DAPI weights
       exist; no new DAPI package release from this run.
-- [ ] Production approval stays manual per `AGENTS.md`; do not auto-approve.
+- [x] Production approval stays manual per `AGENTS.md`; do not auto-approve.
 
 **Release gates for the eventual DAPI model (v0.2.0):**
 
@@ -164,7 +163,7 @@ See `docs/NOVELTY_REPORT.md` (summary: H&E->DAPI well-published since 2024, but 
 1. Wait for the panCK epoch-200 checkpoint; archive it as an ablation.
 2. Run full `val`/`test` panCK evaluation into `docs/metrics_panck_512.json`
    using `src/models/eval_offline.py --out ... --label ... --target ...`.
-3. Fill `docs/BENCHMARK.md` and publish **v0.1.2-ablation** (not DAPI).
+3. Publish the internal ablation note and metrics in git (no release tag).
 4. Build corrected 1024px HDF5 with `scripts/data/pack_hemit_1024.py`.
 5. Upload to Kaggle and train the corrected U-Net DAPI baseline.
 

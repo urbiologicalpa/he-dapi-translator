@@ -6,8 +6,10 @@
 - The epoch-199/200 CPU run and all current demo/package weights are an
   **H&E → panCK ablation** caused by using label channel `ch2` instead of
   `ch0` (DAPI).
-- The next milestone is a corrected 1024px DAPI baseline on a Kaggle T4,
-  followed by full validation/test evaluation.
+- The panCK ablation now has full **630 val + 945 test** metrics; they are
+  engineering baselines, not DAPI results.
+- Corrected 1024px HEMIT HDF5 is built and verified. The next milestone is the
+  DAPI baseline on a Kaggle T4.
 - Paper targets are listed below for orientation; they are **not** results from
   this repository.
 
@@ -58,8 +60,8 @@ Protocol notes from the paper/reference implementation:
 
 | Run | Target | Status | Metrics |
 |---|---|---|---|
-| Local CPU, 200 epochs, 512px | panCK (`ch2`) | Ablation, retained | 30-image val subset, ~29 dB PSNR; not DAPI |
-| Corrected 1024px U-Net | DAPI (`ch0`) | Not started | — |
+| Local CPU, 200 epochs, 512px | panCK (`ch2`) | Ablation, retained | Full 630 val / 945 test: SSIM 0.739 / 0.789, Pearson 0.507 / 0.878, PSNR 29.23 / 30.65 dB; not DAPI |
+| Corrected 1024px U-Net | DAPI (`ch0`) | Data ready; training queued | — |
 | Corrected dual-branch | DAPI (`ch0`) | Not implemented | — |
 | Reverse DAPI → H&E | H&E | Not available | — |
 
@@ -75,4 +77,5 @@ Use the official split, not a 30-image subset:
 - Keep per-image outputs or hashes so the numbers can be audited.
 
 Do not compare a 512px panCK ablation to 1024px DAPI paper numbers. They differ
-in target, resolution, and evaluation set.
+in target, resolution, and evaluation set. Full ablation provenance is in
+[`ABLATION_PANCK.md`](ABLATION_PANCK.md).

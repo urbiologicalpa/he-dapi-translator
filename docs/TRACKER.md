@@ -20,9 +20,9 @@ used `ch2` as the target. Consequences:
 
 | Run | Status | Details |
 |---|---|---|
-| Local CPU, 512px | Finishing panCK ablation | Epoch 199 saved; epoch 200 running at 17:09 UTC; ETA ~19:45–20:00 UTC 2026-10-20. Do not treat as DAPI. |
-| Kaggle T4 | Idle, no DAPI job | 2× Tesla T4 15.64 GB, torch 2.11.0+cu128. 0.01h used, 29.99h remaining; resets 2026-10-24. Old kernels are panCK. |
-| Corrected 1024px DAPI | Blocked | Waiting for the ablation to finish, then build H5 and upload data/code datasets. |
+| Local CPU, 512px | **Complete** | Epoch 200 finished 2026-10-20 19:34 UTC; full 630/945 panCK eval recorded. Do not treat as DAPI. |
+| Kaggle T4 | Data upload in progress | 2× Tesla T4 15.64 GB. 29.99h remaining; resets 2026-10-24. New DAPI dataset is processing; no DAPI job yet. |
+| Corrected 1024px DAPI | Data ready | `hemit_*_1024.h5` built and verified; upload/smoke/training next. |
 | DAPI → H&E | Not started | Trainer is a smoke-test skeleton; no real weights. |
 
 ## Phases
@@ -42,19 +42,13 @@ progress.
 
 ## Next actions
 
-1. Let the panCK epoch 200 finish; archive it as an ablation.
-2. Run full 630 val + 945 test panCK evaluation into
-   `docs/metrics_panck_512.json`.
-3. Publish the ablation engineering note and full metrics in git; keep the
-   weights internal and do not tag a model release.
-4. Build corrected 1024px H5 with gzip and verify `dapi == mihc[...,0]`.
-5. Upload the data and code to private Kaggle datasets.
-6. Run the 512px Kaggle smoke test and record seconds/step + VRAM.
-7. Pretrain 40 epochs at 512, then fine-tune 20 epochs at 1024 with resume.
-8. Evaluate full 630 val + 945 test; publish metrics with the target channel.
-9. Implement/vendor the dual-branch Swin-T + FMF generator.
-10. Plan reverse DAPI → H&E with honest "predicted H&E-like" labeling.
-11. Benchmark 512px tiled/INT8 deployment on the 3.7 GB box.
+1. Verify the private Kaggle data dataset contains train/val/test.
+2. Upload the code dataset and run the 512px smoke test; record seconds/step + VRAM.
+3. Pretrain 40 epochs at 512, then fine-tune 20 epochs at 1024 with resume.
+4. Evaluate full 630 val + 945 test; publish DAPI metrics with the target channel.
+5. Implement/vendor the dual-branch Swin-T + FMF generator.
+6. Train reverse DAPI → H&E, then add a direction router for one plugin/API.
+7. Benchmark 512px tiled/INT8 deployment on the 3.7 GB box.
 
 ## Commands
 

@@ -46,11 +46,11 @@ one-way H&E → DAPI paper reproduction.
 | Area | State | Notes |
 |---|---|---|
 | Bidirectional plugin / one workflow | **Not available** | UI/API routing scaffold exists; reverse model is untrained, so this is not yet a bidirectional product |
-| H&E → panCK ablation | **Finishing / archive** | Local CPU run, epoch 199 saved, epoch 200 running; used only to validate the pipeline |
-| H&E → DAPI | **Not trained yet** | Data fix is in place; corrected 1024px run is queued |
+| H&E → panCK ablation | **Complete / archived** | 200 epochs, full 630/945 evaluation; used only to validate the pipeline |
+| H&E → DAPI | **Not trained yet** | Corrected 1024px H5 is built and verified; Kaggle upload/smoke/training queued |
 | DAPI → H&E | **Not available** | The CycleGAN trainer is a smoke-test skeleton; no real weights |
 | Dual-branch Swin + FMF | **Not implemented** | `train_paired.py` currently builds the U-Net baseline |
-| Data pipeline | **Implemented** | HEMIT 5,292 pairs; streaming 512px builder + corrected 1024px builder |
+| Data pipeline | **Implemented** | HEMIT 5,292 pairs; corrected 1024px H5 built for train/val/test |
 | Patch inference | **Implemented** | PyTorch + tiled 512px inference on CPU |
 | WSI inference | **Experimental** | Tiled/streaming path exists; not validated at scale |
 | Backend / frontend | **Alpha** | FastAPI + React drag-and-drop UI; Docker staging build |
@@ -318,8 +318,8 @@ Generated artifacts are git-ignored:
 - [x] Identify and fix the DAPI channel-order bug (`ch0`, not `ch2`).
 - [x] Add channel-order regression tests and a corrected 1024px builder.
 - [x] Confirm Kaggle T4 availability and the free GPU quota path.
-- [ ] Archive the panCK ablation and publish full 630/945 benchmark numbers.
-- [ ] Build and verify corrected 1024px HEMIT HDF5.
+- [x] Archive the panCK ablation and record full 630/945 benchmark numbers.
+- [x] Build and verify corrected 1024px HEMIT HDF5.
 - [ ] Train corrected U-Net H&E → DAPI baseline on 1024px data.
 - [ ] Run the full 630-image validation and 945-image held-out test evaluation.
 - [ ] Implement/vendor the dual-branch Swin-T + FMF generator.

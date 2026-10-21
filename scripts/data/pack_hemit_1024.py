@@ -56,7 +56,11 @@ def normalize_he(he: np.ndarray, normalizer) -> np.ndarray:
     if normalizer is None:
         return he
     result = normalizer.normalize(he, stains=False)
-    return result[0] if isinstance(result, tuple) else result
+    result = result[0] if isinstance(result, tuple) else result
+    result = np.asarray(result)
+    if result.shape != he.shape or not np.isfinite(result).all():
+        raise ValueError(f"Macenko returned invalid result {result.shape}")
+    return np.clip(result, 0, 255).astype(np.uint8, copy=False)
 
 
 def pair_files(root: Path, split: str) -> list[tuple[Path, Path]]:
@@ -102,6 +106,7 @@ def build_split(
 
     tmp = out.with_name(out.name + ".tmp")
     n = len(pairs)
+    macenko_failures = 0
     opts = {"compression": compression}
     if compression == "gzip":
         opts["compression_opts"] = compression_level
@@ -126,7 +131,11 @@ def build_split(
             if he.shape[0] != patch:
                 he = center_crop(he, patch)
                 mihc = center_crop(mihc, patch)
-            he = normalize_he(he, normalizer)
+            try:
+                he = normalize_he(he, normalizer)
+            except Exception as exc:
+                macenko_failures += 1
+                print(f"  [{split}] Macenko fallback at {he_p.name}: {exc}")
             dapi = extract_dapi(mihc)
             f["he"][i] = he
             f["mihc"][i] = mihc
@@ -142,6 +151,7 @@ def build_split(
         f.attrs["dapi_channel"] = DAPI_CHANNEL
         f.attrs["macenko"] = normalizer is not None
         f.attrs["macenko_reference"] = "torchstain_default"
+        f.attrs["macenko_failures"] = macenko_failures
         f.attrs["compression"] = compression
         if limit:
             f.attrs["subset_limit"] = limit

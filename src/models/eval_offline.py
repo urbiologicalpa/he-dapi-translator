@@ -13,9 +13,11 @@ import gc
 from pathlib import Path
 from datetime import datetime, timezone
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from skimage.metrics import structural_similarity
 
 
 def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
@@ -55,6 +57,8 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
     bce = nn.BCEWithLogitsLoss()
 
     L1 = SE_PSNR = SS = DICE = DL = 0.0
+    SSIM_REAL = PEARSON = 0.0
+    PEARSON_N = 0
     n = 0
     with torch.no_grad():
         for b in loader:
@@ -66,6 +70,13 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
             mse = mse_fn(fake, real).item()
             SE_PSNR += 10 * math.log10(1 / max(mse, 1e-12))
             SS += ssim_fn(fake, real).item()
+            fake_np = fake[0, 0].detach().cpu().numpy()
+            real_np = real[0, 0].detach().cpu().numpy()
+            SSIM_REAL += structural_similarity(real_np, fake_np, data_range=1.0)
+            corr = float(np.corrcoef(real_np.ravel(), fake_np.ravel())[0, 1])
+            if np.isfinite(corr):
+                PEARSON += corr
+                PEARSON_N += 1
             DICE += (1 - dice_fn(fake, real).item())
             rp = torch.cat([he01, real], 1)
             fp = torch.cat([he01, fake], 1)
@@ -86,10 +97,12 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
         "train_G_loss": round(train_gloss, 4),
         "val_L1": round(L1 / n, 4),
         "val_PSNR_dB": round(SE_PSNR / n, 2),
+        "val_SSIM": round(SSIM_REAL / n, 4),
+        "val_Pearson": round(PEARSON / PEARSON_N, 4) if PEARSON_N else None,
         "val_SSIM_loss_proxy": round(SS / n, 4),
         "val_Dice_thresh01": round(DICE / n, 4),
         "val_D_loss": round(DL / n, 4),
-        "note": "SSIM is fallback proxy (no kornia); Dice thresh 0.1 fixed (0.5 vacuous); D-loss ~0.69=balanced",
+        "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
         "evaluated": datetime.now(timezone.utc).isoformat(),
     }
 

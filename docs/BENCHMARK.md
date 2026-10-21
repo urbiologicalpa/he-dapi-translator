@@ -36,12 +36,14 @@ Change one variable at a time.
 | Scenario | Target | Res | Macenko | Flips | SSIM | Pearson | PSNR | Purpose |
 |---|---|---:|---:|---:|---:|---:|---:|---|
 | Correct target | DAPI ch0 | 1024 | yes | no | TBD | TBD | TBD | main |
-| Wrong target (legacy) | panCK ch2 | 512 | no | yes | TBD | — | TBD | pipeline baseline only |
+| Wrong target (legacy) | panCK ch2 | 512 | no | yes | 0.739 / 0.789 | 0.507 / 0.878 | 29.2 / 30.6 | pipeline baseline only |
 | No normalization | DAPI ch0 | 1024 | no | no | TBD | TBD | TBD | stain sensitivity |
 | Resolution | DAPI ch0 | 512 vs 1024 | yes | no | TBD | TBD | TBD | resolution effect |
 | Architecture | DAPI ch0 | 1024 | yes | no | TBD | TBD | TBD | U-Net vs dual-branch |
 
-The legacy 200-epoch panCK run belongs in this table, not Table 1.
+The legacy 200-epoch panCK run belongs in this table, not Table 1. The row
+shows **val / test**; full provenance is in
+[`ABLATION_PANCK.md`](ABLATION_PANCK.md).
 
 ## Table 3 — Deployment scenarios
 
