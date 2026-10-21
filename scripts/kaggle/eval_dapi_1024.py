@@ -41,7 +41,7 @@ def install_code(code: Path) -> None:
             zf.extractall(ROOT)
         print(f"extracted {bundle} -> {ROOT}")
         return
-    source = code / "code_bundle"
+    source = code if (code / "src/models/train_paired.py").exists() else code / "code_bundle"
     if (source / "src/models/train_paired.py").exists():
         for item in source.iterdir():
             dst = ROOT / item.name
@@ -51,7 +51,7 @@ def install_code(code: Path) -> None:
                 shutil.copy2(item, dst)
         print(f"copied {source} -> {ROOT}")
         return
-    raise SystemExit(f"code root has no bundle: {code}")
+    raise SystemExit(f"code root has no source: {code}")
 
 
 def find_one(pattern: str) -> Path:
