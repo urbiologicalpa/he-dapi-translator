@@ -1,7 +1,7 @@
 {
   "project": "he-dapi-translator",
-  "updated": "2026-10-21T13:28:00Z",
-  "status": "alpha; panCK ablation complete; 512 DAPI pretrain done; 1024 fine-tune queued",
+  "updated": "2026-10-21T14:10:00Z",
+  "status": "alpha; panCK ablation complete; DAPI 512+1024 trained; full val/test eval running",
   "overall_percent": 50,
   "machine": {
     "cpu": "Intel i5-10210U 8vCPU 4c/8t",
@@ -125,9 +125,9 @@
     }
   ],
   "kaggle": {
-    "checked_utc": "2026-10-21T13:28:00Z",
-    "dapi_job": "finetune_queued",
-    "reason": "kernel v6 queued for GPU",
+    "checked_utc": "2026-10-21T14:10:00Z",
+    "dapi_job": "eval_running",
+    "reason": "kernel v8 evaluating 630 val + 945 test",
     "gpu_remaining_hours": 25.9,
     "quota_refresh": "2026-10-24T00:00:00",
     "old_kernels": [
@@ -145,6 +145,7 @@
     "pretrain_epoch": 20,
     "pretrain_total_epochs": 20,
     "pretrain_eta_utc": "2026-10-21T13:10:00Z",
-    "pretrain_checkpoint_sha256": "be0b2892cf91f8e00ae844aa2ae349986414dd0a46da657d0ef6fa2aedf4abf4"
+    "pretrain_checkpoint_sha256": "be0b2892cf91f8e00ae844aa2ae349986414dd0a46da657d0ef6fa2aedf4abf4",
+    "finetune_checkpoint_sha256": "871560a14e54a8f9ba8a7b59b7b4a3e0a61e4d0c0936845fd3d938b5bfb4103d"
   }
 }

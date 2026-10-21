@@ -1,6 +1,6 @@
 # Kaggle DAPI runbook and status
 
-Last checked: **2026-10-21 13:28 UTC**
+Last checked: **2026-10-21 14:10 UTC**
 
 ## Current status
 
@@ -19,9 +19,13 @@ Last checked: **2026-10-21 13:28 UTC**
   - Checkpoint: `checkpoints/dapi_pretrain/checkpoint_last.pt`
   - SHA-256: `be0b2892cf91f8e00ae844aa2ae349986414dd0a46da657d0ef6fa2aedf4abf4`
   - Uploaded as private dataset `bikasash/he-dapi-dapi-pretrain-ckpt`
-- **1024 fine-tune** launched as kernel **v6** with `train_dapi_finetune.py`;
-  currently `QUEUED` for a GPU worker.
-  - 2×500 steps at native 1024 from the pretrain checkpoint.
+- **1024 fine-tune complete** at ~`13:37 UTC` (2×500 steps).
+  - Checkpoint: `checkpoints/dapi_finetune/checkpoint_last.pt`
+  - SHA-256: `871560a14e54a8f9ba8a7b59b7b4a3e0a61e4d0c0936845fd3d938b5bfb4103d`
+  - Uploaded as private dataset `bikasash/he-dapi-dapi-finetune-ckpt`
+- **Full val/test eval** launched as kernel **v8** with `eval_dapi_1024.py`;
+  running at `14:10 UTC` (630 val + 945 test at 1024).
+- Test dataset `bikasash/hemit-dapi-1024-ch0-test` is ready and attached.
 - Test H5 is **not attached** to the pretrain kernel; attach
   `bikasash/hemit-dapi-1024-ch0-test` for final test eval.
 - GPU quota at launch: **~29.9h**, refresh `2026-10-24T00:00:00`.
@@ -219,5 +223,5 @@ both into `/kaggle/working`, and run the same command with the mounted H5 path.
 | Upload code dataset | ready | nested `code_bundle/` mount handled |
 | Kaggle smoke | **done** | ~1.96 s/step at 512, batch 2 |
 | 512 pretrain | **done** | epoch 20/20; checkpoint sha `be0b2892…f4abf4` |
-| 1024 fine-tune | **queued** | kernel v6; 2×500 steps from pretrain checkpoint |
-| Full val/test eval | pending | 630 / 945 |
+| 1024 fine-tune | **done** | 2×500 steps; checkpoint sha `871560a1…b4103d` |
+| Full val/test eval | **running** | kernel v8; 630 val + 945 test |
