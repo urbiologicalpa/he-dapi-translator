@@ -21,7 +21,7 @@ used `ch2` as the target. Consequences:
 | Run | Status | Details |
 |---|---|---|
 | Local CPU, 512px | **Complete** | Epoch 200 finished 2026-10-20 19:34 UTC; full 630/945 panCK eval recorded. Do not treat as DAPI. |
-| Kaggle T4 | 512 pretrain running | Kernel v5, ~29.9h quota; resets 2026-10-24. Smoke: ~1.96 s/step at 512. |
+| Kaggle T4 | 512 pretrain running | Kernel v5, epoch 10/20 at 12:43 UTC; ~26.5 min/epoch; checkpoints every epoch. |
 | Corrected 1024px DAPI | Ready to pretrain | Data + code datasets ready; 20-epoch 512 pretrain, then 2×500-step 1024 fine-tune. |
 | DAPI → H&E | Not started | Trainer is a smoke-test skeleton; no real weights. |
 
