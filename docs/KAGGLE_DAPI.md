@@ -1,6 +1,6 @@
 # Kaggle DAPI runbook and status
 
-Last checked: **2026-10-21 12:45 UTC**
+Last checked: **2026-10-21 12:58 UTC**
 
 ## Current status
 
@@ -16,10 +16,11 @@ Last checked: **2026-10-21 12:45 UTC**
   - T4, torch 2.11.0+cu128
   - 20 steps in ~39s at 512px, batch 2: **~1.96 s/step, ~1 sample/s**
 - Kernel **v5** is running the 512 pretrain with `train_dapi_pretrain.py`.
-  - At `12:43 UTC`: **epoch 10/20**, ~1.7 s/step, **~26.5 min/epoch**
+  - At `12:56 UTC`: **epoch 18/20**, ~7 min/epoch steady state
   - Checkpoints save every epoch under `/kaggle/working/checkpoints/dapi_pretrain/`
-  - Pretrain ETA: **~17:25 UTC**
-- Revised target: 20 epochs at 512 (~9h), then 2×500 steps at 1024 (~2h).
+  - Pretrain ETA: **~13:10 UTC** after warm-up/caching; much faster than the
+    initial 26.5 min/epoch estimate
+- Revised target: 20 epochs at 512 (~2.5h), then 2×500 steps at 1024 (~1–2h).
 - Test H5 is **not attached** to the pretrain kernel; attach
   `bikasash/hemit-dapi-1024-ch0-test` for final test eval.
 - GPU quota at launch: **~29.9h**, refresh `2026-10-24T00:00:00`.
@@ -29,7 +30,7 @@ Last checked: **2026-10-21 12:45 UTC**
 A 100-epoch, native-1024px run is not realistic on a 30h T4 quota. Plan:
 
 1. **Smoke** — done: ~1.96 s/step at 512, batch 2.
-2. **Pretrain** — 20 epochs at 512; ~9h at the measured ~26.5 min/epoch.
+2. **Pretrain** — 20 epochs at 512; ~2.5h at the measured ~7 min/epoch steady state.
 3. **Fine-tune** — 2×500 steps at native 1024 from the 512 checkpoint.
 4. **Evaluate** — full 630 val + 945 test at 1024; save labeled metrics.
 
@@ -216,6 +217,6 @@ both into `/kaggle/working`, and run the same command with the mounted H5 path.
 | Upload data dataset | ready (train/val) | test split in separate dataset |
 | Upload code dataset | ready | nested `code_bundle/` mount handled |
 | Kaggle smoke | **done** | ~1.96 s/step at 512, batch 2 |
-| 512 pretrain | **running** | kernel v5; epoch 10/20 at 12:43 UTC; checkpoints saving |
+| 512 pretrain | **running** | kernel v5; epoch 18/20 at 12:56 UTC; ETA ~13:10 UTC |
 | 1024 fine-tune | pending | 2×500 steps |
 | Full val/test eval | pending | 630 / 945 |
