@@ -31,16 +31,24 @@ def run(cmd, cwd=ROOT):
 
 
 def find_code() -> Path | None:
-    print("INPUT dirs:", [p.name for p in sorted(INPUT.glob("*"))])
-    for base in sorted(INPUT.glob("*")):
-        if (base / "src/models/train_paired.py").exists():
-            return base
-        if (base / "code_bundle.zip").exists():
-            return base
-        if (base / "code_bundle/src/models/train_paired.py").exists():
-            return base
+    print("INPUT top:", [p.name for p in sorted(INPUT.glob("*"))])
+    matches = list(INPUT.rglob("src/models/train_paired.py"))
+    if matches:
+        root = matches[0].parents[2]
+        print("found code root", root)
+        return root
+    bundles = list(INPUT.rglob("code_bundle.zip"))
+    if bundles:
+        print("found bundle", bundles[0])
+        return bundles[0].parent
+    nested = list(INPUT.rglob("code_bundle/src/models/train_paired.py"))
+    if nested:
+        root = nested[0].parents[3]
+        print("found nested code root", root)
+        return root
     if Path("src/models/train_paired.py").exists():
         return Path.cwd()
+    print("INPUT tree sample:", [str(p) for p in list(INPUT.rglob("*"))[:40]])
     return None
 
 
