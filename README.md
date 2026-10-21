@@ -11,19 +11,20 @@ Product scaffold for a **bidirectional H&E ↔ DAPI virtual staining tool**: one
 plugin/API/UI where a user can drop either modality and request the other, on
 patches or whole-slide images.
 
-**The bidirectional product is not available yet.** Only a one-way forward
-baseline is being trained; the reverse direction is still a skeleton. This repo
-does not claim a working bidirectional model until both directions have trained,
-evaluated weights. The product thesis is the unified workflow, not another
-one-way H&E → DAPI paper reproduction.
+**The bidirectional product is not available yet.** A corrected one-way
+forward baseline has been trained, but it is undertrained and internal; the
+reverse direction is still a skeleton. This repo does not claim a working
+bidirectional model until both directions have trained, evaluated weights. The
+product thesis is the unified workflow, not another one-way H&E → DAPI paper
+reproduction.
 
-> **Important status (2026-10-20).** A channel-order bug in the previous data
-> pipeline trained the current checkpoints on **panCK (ch2)**, not DAPI (ch0).
+> **Important status (2026-10-21).** A channel-order bug in the previous data
+> pipeline trained the public checkpoints on **panCK (ch2)**, not DAPI (ch0).
 > The public weights and the epoch-199/200 run are therefore an H&E → panCK
-> ablation, **not a DAPI model**. The data builder and loader are fixed; the
-> corrected DAPI model is the next training milestone. Do not use the current
-> weights as a DAPI solution. See [Results](#results) and
-> [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md).
+> ablation, **not a DAPI model**. The data builder and loader are fixed, and a
+> corrected DAPI baseline now exists internally, but it is undertrained and not
+> release quality. Do not use the public weights as a DAPI solution. See
+> [Results](#results) and [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md).
 
 ## Contents
 
@@ -47,7 +48,7 @@ one-way H&E → DAPI paper reproduction.
 |---|---|---|
 | Bidirectional plugin / one workflow | **Not available** | UI/API routing scaffold exists; reverse model is untrained, so this is not yet a bidirectional product |
 | H&E → panCK ablation | **Complete / archived** | 200 epochs, full 630/945 evaluation; used only to validate the pipeline |
-| H&E → DAPI | **Not trained yet** | Corrected 1024px H5 ready; Kaggle smoke passed; DAPI pretrain next |
+| H&E → DAPI | **First baseline trained / internal** | 20 epochs @512 + 1k steps @1024; full 630/945 eval; undertrained, not released |
 | DAPI → H&E | **Not available** | The CycleGAN trainer is a smoke-test skeleton; no real weights |
 | Dual-branch Swin + FMF | **Not implemented** | `train_paired.py` currently builds the U-Net baseline |
 | Data pipeline | **Implemented** | HEMIT 5,292 pairs; corrected 1024px H5 built for train/val/test |
@@ -81,7 +82,8 @@ direction, and only then expose both directions as one bidirectional plugin.
 
 - **Implemented forward baseline:** a compact U-Net generator (3 → 1) with a
   PatchGAN discriminator, L1 + SSIM, optional DISTS, and a nuclei-Dice auxiliary
-  loss. This is the one-way baseline, not the bidirectional product.
+  loss. A corrected DAPI baseline is trained internally; it is the one-way
+  baseline, not the bidirectional product.
 - **Implemented reverse trainer skeleton:** a ResNet generator and a
   CycleGAN-style dummy loop. It is not a working DAPI → H&E model yet.
 - **Not implemented:** a unified bidirectional model, direction router, shared
@@ -106,9 +108,8 @@ direction, and only then expose both directions as one bidirectional plugin.
 
 - A unified bidirectional model or direction router.
 - A trained DAPI → H&E direction.
-- Full 1024px DAPI training.
 - HEMIT dual-branch / Swin / FMF.
-- Full 630-image validation and held-out test evaluation for DAPI.
+- Release-quality DAPI weights.
 - Clinical or diagnostic validation of any kind.
 
 ## Data
@@ -224,18 +225,18 @@ PYTHONPATH=. python -m src.models.train_paired \
 This is a 512px, batch-2, grad-accum-4 CPU configuration. It is useful as an
 engineering baseline but it is **not** the DAPI experiment.
 
-### Corrected DAPI run (next)
+### Corrected DAPI baseline (done, undertrained)
 
-The intended protocol follows the HEMIT paper:
+Current internal baseline:
 
-- 1024×1024 patches, 50% overlap where applicable.
-- Macenko H&E normalization.
-- Adam, `lr=3e-5`, 50 epochs then linear decay (100 epochs total), `λ_L1=30`.
-- No random flips; batch size 2 on a 16 GB GPU.
-- Checkpoint every epoch and resume after Kaggle's 12-hour session limit.
+- 20 epochs at 512px on the corrected 1024px H5, then 2×500 steps at 1024px.
+- Kaggle Tesla T4, U-Net `ngf=64`, GAN + L1 + SSIM.
+- Full 630 val + 945 test evaluation.
+- Checkpoint: `resources/models/checkpoints/he2dapi_dapi_1024/checkpoint_last.pt`.
 
-Start with the U-Net baseline on corrected 1024px data. Add the dual-branch
-generator only after the baseline has a clean, reproducible evaluation.
+Val/test SSIM is 0.670 / 0.725 and Pearson is 0.255 / 0.611. This is below the
+paper and not release quality. The next step is paired reverse DAPI → H&E, then
+unpaired CycleGAN, then a dual-branch/quality improvement pass.
 
 ## Inference
 
@@ -263,10 +264,18 @@ will be published with the first validated DAPI checkpoint.
 
 ## Results
 
-### DAPI target: no valid result yet
+### DAPI target: first corrected baseline
 
-There is **no trained DAPI model** to report. The repository intentionally does
-not present the old metrics as DAPI results.
+The first corrected DAPI baseline is trained but undertrained. Full 630 val /
+945 test:
+
+| Split | n | SSIM | Pearson | PSNR (dB) | Dice |
+|---|---:|---:|---:|---:|---:|
+| val | 630 | 0.670 | 0.255 | 28.77 | 0.104 |
+| test | 945 | 0.725 | 0.611 | 26.60 | 0.449 |
+
+Do not treat this as release quality; the val/test gap is large and the model
+has only 1,000 fine-tune steps at 1024.
 
 Reference numbers from the HEMIT paper (DAPI column, for orientation only):
 
@@ -283,10 +292,10 @@ comparison protocol and table templates are in
 ### panCK ablation (do not read as DAPI)
 
 The local CPU run optimized `mihc[..., 2]` (panCK). Its checkpoints,
-`docs/metrics_eval.json`, and the current demo weights belong to this ablation.
-On a 30-image validation subset the pipeline reached roughly **29 dB PSNR**;
-that number is not comparable to the DAPI table above and is not a claim of
-DAPI quality. See [`docs/RESULTS.md`](docs/RESULTS.md) for the full explanation.
+`docs/metrics_eval.json`, and the current demo/package weights belong to this
+ablation. Full 630 val / 945 test PSNR is 29.23 / 30.65 dB; that number is not
+comparable to the DAPI table above and is not a claim of DAPI quality. See
+[`docs/RESULTS.md`](docs/RESULTS.md) for the full explanation.
 
 ## Repository layout
 

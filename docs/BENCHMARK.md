@@ -18,13 +18,13 @@ or evaluation sets.
 
 ## Table 1 — DAPI main comparison
 
-Only valid DAPI runs belong here.
+Only valid DAPI runs belong here. The first row is **val / test**; it is a short 1024 fine-tune from a 20-epoch 512 pretrain, not the paper protocol. These are point estimates; mean ± std / CIs are still pending.
 
 | Method | Target | Res | Train data | Epochs | SSIM ↑ | Pearson ↑ | PSNR ↑ | Dice ↑ | Params | Status |
 |---|---|---:|---|---:|---:|---:|---:|---:|---:|---|
 | U-Net baseline | DAPI ch0 | 512 | 3,717 | 100 | TBD | TBD | TBD | TBD | TBD | planned |
 | U-Net baseline | DAPI ch0 | 1024 | 3,717 | 100 | TBD | TBD | TBD | TBD | TBD | planned |
-| Pix2Pix U-Net | DAPI ch0 | 1024 | 3,717 | 100 | TBD | TBD | TBD | TBD | TBD | planned |
+| Pix2Pix U-Net (this repo) | DAPI ch0 | 1024 | 3,717 | 20@512 + 1k@1024 | 0.670 / 0.725 | 0.255 / 0.611 | 28.77 / 26.60 | 0.104 / 0.449 | 6.17M | val / test; undertrained |
 | Dual-branch Swin+FMF | DAPI ch0 | 1024 | 3,717 | 100 | TBD | TBD | TBD | TBD | TBD | planned |
 | Paper U-Net | DAPI | 1024 | HEMIT | — | 0.791 | 0.659 | 27.929 | — | — | external |
 | Paper dual-branch | DAPI | 1024 | HEMIT | — | 0.815 | 0.716 | 28.610 | — | — | external |
@@ -35,7 +35,7 @@ Change one variable at a time.
 
 | Scenario | Target | Res | Macenko | Flips | SSIM | Pearson | PSNR | Purpose |
 |---|---|---:|---:|---:|---:|---:|---:|---|
-| Correct target | DAPI ch0 | 1024 | yes | no | TBD | TBD | TBD | main |
+| Correct target | DAPI ch0 | 1024 | yes | no | 0.670 / 0.725 | 0.255 / 0.611 | 28.8 / 26.6 | main; 1k fine-tune steps |
 | Wrong target (legacy) | panCK ch2 | 512 | no | yes | 0.739 / 0.789 | 0.507 / 0.878 | 29.2 / 30.6 | pipeline baseline only |
 | No normalization | DAPI ch0 | 1024 | no | no | TBD | TBD | TBD | stain sensitivity |
 | Resolution | DAPI ch0 | 512 vs 1024 | yes | no | TBD | TBD | TBD | resolution effect |

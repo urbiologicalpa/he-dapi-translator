@@ -1,0 +1,19 @@
+{
+  "checkpoint": "/kaggle/input/he-dapi-dapi-finetune-ckpt/checkpoint_last.pt",
+  "file_epoch": 2,
+  "split": "test",
+  "resolution": 1024,
+  "n": 945,
+  "train_G_loss": 3.3349,
+  "val_L1": 0.0311,
+  "val_PSNR_dB": 26.6,
+  "val_SSIM": 0.7253,
+  "val_Pearson": 0.6107,
+  "val_SSIM_loss_proxy": 0.1327,
+  "val_Dice_thresh01": 0.4489,
+  "val_D_loss": 0.7994,
+  "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
+  "evaluated": "2026-10-21T15:17:55.649566+00:00",
+  "label": "dapi-1024-unet",
+  "target": "DAPI ch0"
+}

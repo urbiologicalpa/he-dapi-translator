@@ -2,14 +2,15 @@
 
 ## TL;DR
 
-- **No valid H&E → DAPI result exists yet.**
+- A corrected **H&E → DAPI baseline now exists**, but it is undertrained and
+  below the paper reference. Its val/test gap is large; do not over-read it.
 - The epoch-199/200 CPU run and all current demo/package weights are an
   **H&E → panCK ablation** caused by using label channel `ch2` instead of
   `ch0` (DAPI).
 - The panCK ablation now has full **630 val + 945 test** metrics; they are
   engineering baselines, not DAPI results.
-- Corrected 1024px HEMIT HDF5 is built and verified. The next milestone is the
-  DAPI baseline on a Kaggle T4.
+- Corrected 1024px HEMIT HDF5 is built and verified. The DAPI baseline has now
+  been trained on a Kaggle T4 (20 epochs at 512 + 1,000 steps at 1024).
 - Paper targets are listed below for orientation; they are **not** results from
   this repository.
 
@@ -61,13 +62,28 @@ Protocol notes from the paper/reference implementation:
 | Run | Target | Status | Metrics |
 |---|---|---|---|
 | Local CPU, 200 epochs, 512px | panCK (`ch2`) | Ablation, retained | Full 630 val / 945 test: SSIM 0.739 / 0.789, Pearson 0.507 / 0.878, PSNR 29.23 / 30.65 dB; not DAPI |
-| Corrected 1024px U-Net | DAPI (`ch0`) | Data ready; training queued | — |
+| Corrected 1024px U-Net | DAPI (`ch0`) | First baseline, undertrained | Full 630 val / 945 test: SSIM 0.670 / 0.725, Pearson 0.255 / 0.611, PSNR 28.77 / 26.60 dB, Dice 0.104 / 0.449 |
 | Corrected dual-branch | DAPI (`ch0`) | Not implemented | — |
 | Reverse DAPI → H&E | H&E | Not available | — |
 
-## Planned evaluation
+## First corrected DAPI baseline
 
-Use the official split, not a 30-image subset:
+Run: Kaggle T4, 20 epochs at 512 (3,717 pairs) then 2×500 steps at 1024.
+Checkpoint: `resources/models/checkpoints/he2dapi_dapi_1024/checkpoint_last.pt`
+(SHA-256 `871560a1…b4103d`). Target: DAPI `ch0`. No Macenko.
+
+| Split | n | SSIM | Pearson | PSNR | Dice |
+|---|---:|---:|---:|---:|---:|
+| val | 630 | 0.670 | 0.255 | 28.77 | 0.104 |
+| test | 945 | 0.725 | 0.611 | 26.60 | 0.449 |
+
+This is **not** paper-level: paper U-Net is SSIM 0.791 / Pearson 0.659.
+The val/test gap is large and likely reflects slide/domain differences plus
+limited fine-tuning. It is a plumbing baseline, not a claim of DAPI quality.
+
+## Evaluation protocol
+
+The baseline used the official split:
 
 - Validation: 630 pairs.
 - Test: 945 pairs.

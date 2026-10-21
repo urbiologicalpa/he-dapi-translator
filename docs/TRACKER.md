@@ -21,8 +21,8 @@ used `ch2` as the target. Consequences:
 | Run | Status | Details |
 |---|---|---|
 | Local CPU, 512px | **Complete** | Epoch 200 finished 2026-10-20 19:34 UTC; full 630/945 panCK eval recorded. Do not treat as DAPI. |
-| Kaggle T4 | Full DAPI eval running | 512 pretrain and 2×500-step 1024 fine-tune done; eval v8 on 630 val + 945 test. |
-| Corrected 1024px DAPI | Evaluating | 512 pretrain + 1024 fine-tune done; full val/test eval running. |
+| Kaggle T4 | DAPI baseline complete | 512 pretrain + 1024 fine-tune + full 630/945 eval done. Next: reverse paired. |
+| Corrected 1024px DAPI | Baseline done, undertrained | val/test SSIM 0.670/0.725, Pearson 0.255/0.611. |
 | DAPI → H&E | Not started | Trainer is a smoke-test skeleton; no real weights. |
 
 ## Phases
@@ -31,9 +31,9 @@ used `ch2` as the target. Consequences:
 |---|---|---:|---|
 | 0. Scoping / infra | Done | 100 | Repo, CI, Docker, packages exist |
 | 1. Data pipeline | Done, corrected | 100 | 5,292 HEMIT pairs; 512px legacy data has wrong target; 1024 builder ready |
-| 2. H&E → DAPI model | In progress | 50 | panCK ablation done; corrected DAPI 512 pretrain running; dual-branch not implemented |
+| 2. H&E → DAPI model | Baseline done | 60 | corrected DAPI baseline trained; undertrained; dual-branch not implemented |
 | 3. App / API | Alpha | 60 | FastAPI + React + Docker; model behind it is the ablation |
-| 4. Validation | Partial | 15 | Full 630/945 panCK ablation eval done; no DAPI evaluation yet |
+| 4. Validation | Partial | 35 | Full 630/945 DAPI baseline + panCK ablation eval done; no CIs/qualitative audit yet |
 | 5. Deployment | Alpha | 55 | GHCR staging, PyPI/HF alpha; corrected weights and CPU benchmark pending |
 
 Overall is intentionally not presented as a single impressive percentage: the
@@ -41,12 +41,12 @@ only completed model is the panCK ablation; DAPI training is still in progress.
 
 ## Next actions
 
-1. Run 20-epoch 512 pretrain on Kaggle, resuming across sessions.
-2. Fine-tune 2×500 steps at 1024 from the 512 checkpoint.
-3. Evaluate full 630 val + 945 test; publish DAPI metrics with the target channel.
-4. Implement/vendor the dual-branch Swin-T + FMF generator.
-5. Train reverse DAPI → H&E, then add a direction router for one plugin/API.
-6. Benchmark 512px tiled/INT8 deployment on the 3.7 GB box.
+1. Implement paired reverse DAPI → H&E (swap inputs/targets in the paired trainer).
+2. Train and evaluate paired reverse on the same 630/945 splits.
+3. Implement full unpaired CycleGAN/CUT and compare against paired reverse.
+4. Add a direction router for one plugin/API.
+5. Improve forward quality with more 1024 steps and/or dual-branch Swin/FMF.
+6. Benchmark tiled/INT8 deployment on the 3.7 GB box.
 
 ## Commands
 
@@ -77,3 +77,5 @@ Kaggle data/code upload, smoke, pretrain, and fine-tune steps are in
 - 2026-10-18: v0.1.0 GHCR release, HF demo, PyPI alpha packages.
 - 2026-10-20: DAPI channel-order correction; Kaggle T4 availability confirmed;
   README/docs rewritten to match what is actually implemented.
+- 2026-10-21: corrected DAPI 512 pretrain + 1024 fine-tune + full 630/945 eval.
+  Baseline is undertrained; reverse paired is next.

@@ -1,6 +1,6 @@
 # Kaggle DAPI runbook and status
 
-Last checked: **2026-10-21 14:10 UTC**
+Last checked: **2026-10-21 15:25 UTC**
 
 ## Current status
 
@@ -23,9 +23,12 @@ Last checked: **2026-10-21 14:10 UTC**
   - Checkpoint: `checkpoints/dapi_finetune/checkpoint_last.pt`
   - SHA-256: `871560a14e54a8f9ba8a7b59b7b4a3e0a61e4d0c0936845fd3d938b5bfb4103d`
   - Uploaded as private dataset `bikasash/he-dapi-dapi-finetune-ckpt`
-- **Full val/test eval** launched as kernel **v8** with `eval_dapi_1024.py`;
-  running at `14:10 UTC` (630 val + 945 test at 1024).
-- Test dataset `bikasash/hemit-dapi-1024-ch0-test` is ready and attached.
+- **Full val/test eval complete** at `15:21 UTC` (kernel v8):
+  - val 630: SSIM 0.6702, Pearson 0.2547, PSNR 28.77, Dice 0.1036
+  - test 945: SSIM 0.7253, Pearson 0.6107, PSNR 26.60, Dice 0.4489
+  - Metrics saved as `docs/metrics_dapi_1024_{val,test}.json`
+- Test dataset `bikasash/hemit-dapi-1024-ch0-test` was ready and attached.
+- This baseline is undertrained, not release quality.
 - Test H5 is **not attached** to the pretrain kernel; attach
   `bikasash/hemit-dapi-1024-ch0-test` for final test eval.
 - GPU quota at launch: **~29.9h**, refresh `2026-10-24T00:00:00`.
@@ -224,4 +227,4 @@ both into `/kaggle/working`, and run the same command with the mounted H5 path.
 | Kaggle smoke | **done** | ~1.96 s/step at 512, batch 2 |
 | 512 pretrain | **done** | epoch 20/20; checkpoint sha `be0b2892…f4abf4` |
 | 1024 fine-tune | **done** | 2×500 steps; checkpoint sha `871560a1…b4103d` |
-| Full val/test eval | **running** | kernel v8; 630 val + 945 test |
+| Full val/test eval | **done** | val/test SSIM 0.670/0.725; see metrics JSON |
