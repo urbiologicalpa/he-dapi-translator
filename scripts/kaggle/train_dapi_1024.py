@@ -31,10 +31,13 @@ def run(cmd, cwd=ROOT):
 
 
 def find_code() -> Path | None:
+    print("INPUT dirs:", [p.name for p in sorted(INPUT.glob("*"))])
     for base in sorted(INPUT.glob("*")):
         if (base / "src/models/train_paired.py").exists():
             return base
         if (base / "code_bundle.zip").exists():
+            return base
+        if (base / "code_bundle/src/models/train_paired.py").exists():
             return base
     if Path("src/models/train_paired.py").exists():
         return Path.cwd()
@@ -49,8 +52,18 @@ def install_code(code: Path) -> None:
             zf.extractall(ROOT)
         print(f"extracted {bundle} -> {ROOT}")
         return
+    source = code / "code_bundle"
+    if (source / "src/models/train_paired.py").exists():
+        for item in source.iterdir():
+            dst = ROOT / item.name
+            if item.is_dir():
+                shutil.copytree(item, dst, dirs_exist_ok=True)
+            else:
+                shutil.copy2(item, dst)
+        print(f"copied extracted code {source} -> {ROOT}")
+        return
     for item in code.iterdir():
-        if item.name in {".git", "data", "resources", "logs"}:
+        if item.name in {".git", "data", "resources", "logs", "code_bundle"}:
             continue
         dst = ROOT / item.name
         if item.is_dir():
