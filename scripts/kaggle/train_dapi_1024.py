@@ -103,11 +103,17 @@ def link_data() -> Path:
 
 
 def find_input_checkpoint() -> Path | None:
-    for p in sorted(INPUT.rglob("checkpoint_epoch*.pt")):
-        return p
-    for p in sorted(INPUT.rglob("checkpoint_last.pt")):
-        return p
-    return None
+    last = sorted(INPUT.rglob("checkpoint_last.pt"))
+    if last:
+        return last[0]
+    epochs: list[tuple[int, Path]] = []
+    for p in INPUT.rglob("checkpoint_epoch*.pt"):
+        try:
+            n = int(p.stem.rsplit("epoch", 1)[-1])
+        except ValueError:
+            n = -1
+        epochs.append((n, p))
+    return max(epochs)[1] if epochs else None
 
 
 def main() -> None:

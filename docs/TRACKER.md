@@ -1,4 +1,4 @@
-# Progress tracker — 2026-10-20
+# Progress tracker — 2026-10-21
 
 > Canonical short status. Machine-readable counterpart: `docs/progress.json`.
 > Detailed pre-2026-10-20 logs remain in git history and `MEMORY.md`.
@@ -14,7 +14,7 @@ used `ch2` as the target. Consequences:
 - The bug is fixed in `scripts/data/pack_hemit.py`,
   `scripts/data/pack_hemit_1024.py`, and `src/models/datasets.py`; regression
   tests are in `tests/test_hemit_channels.py`.
-- Corrected 1024px HEMIT H5 has not been built yet.
+- Corrected 1024px HEMIT H5 has been built and verified for all splits.
 
 ## Live runs
 
@@ -22,7 +22,7 @@ used `ch2` as the target. Consequences:
 |---|---|---|
 | Local CPU, 512px | **Complete** | Epoch 200 finished 2026-10-20 19:34 UTC; full 630/945 panCK eval recorded. Do not treat as DAPI. |
 | Kaggle T4 | 512 pretrain running | Kernel v5, epoch 10/20 at 12:43 UTC; ~26.5 min/epoch; checkpoints every epoch. |
-| Corrected 1024px DAPI | Ready to pretrain | Data + code datasets ready; 20-epoch 512 pretrain, then 2×500-step 1024 fine-tune. |
+| Corrected 1024px DAPI | Pretraining | 20-epoch 512 run in progress; then 2×500-step 1024 fine-tune. |
 | DAPI → H&E | Not started | Trainer is a smoke-test skeleton; no real weights. |
 
 ## Phases
@@ -31,14 +31,13 @@ used `ch2` as the target. Consequences:
 |---|---|---:|---|
 | 0. Scoping / infra | Done | 100 | Repo, CI, Docker, packages exist |
 | 1. Data pipeline | Done, corrected | 100 | 5,292 HEMIT pairs; 512px legacy data has wrong target; 1024 builder ready |
-| 2. H&E → DAPI model | In progress | 45 | panCK ablation done; corrected DAPI baseline not started; dual-branch not implemented |
+| 2. H&E → DAPI model | In progress | 50 | panCK ablation done; corrected DAPI 512 pretrain running; dual-branch not implemented |
 | 3. App / API | Alpha | 60 | FastAPI + React + Docker; model behind it is the ablation |
-| 4. Validation | Not started | 5 | No full 630/945 DAPI evaluation; only 30-image ablation metrics |
+| 4. Validation | Partial | 15 | Full 630/945 panCK ablation eval done; no DAPI evaluation yet |
 | 5. Deployment | Alpha | 55 | GHCR staging, PyPI/HF alpha; corrected weights and CPU benchmark pending |
 
 Overall is intentionally not presented as a single impressive percentage: the
-only trained model is the wrong target, so training progress is not DAPI
-progress.
+only completed model is the panCK ablation; DAPI training is still in progress.
 
 ## Next actions
 

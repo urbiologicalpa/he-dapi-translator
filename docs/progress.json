@@ -1,6 +1,6 @@
 {
   "project": "he-dapi-translator",
-  "updated": "2026-10-21T12:45:00Z",
+  "updated": "2026-10-21T12:50:00Z",
   "status": "alpha; panCK ablation complete; corrected 1024 H5 built; 512 DAPI pretrain epoch 10/20",
   "overall_percent": 50,
   "machine": {
@@ -104,10 +104,9 @@
     }
   ],
   "next_actions": [
-    "Finish uploading the private 1024 Kaggle dataset (test split needs verification)",
-    "Upload code dataset and run the 512px Kaggle smoke test",
-    "Pretrain 40 epochs at 512, then fine-tune 20 epochs at 1024",
-    "Run full 630/945 DAPI evaluation and fill docs/BENCHMARK.md",
+    "Monitor 512 DAPI pretrain to epoch 20; checkpoint/resume if the session cap hits",
+    "Fine-tune 2x500 steps at 1024 from the 512 checkpoint",
+    "Attach test dataset and run full 630/945 DAPI evaluation",
     "Implement/vendor dual-branch Swin-T + FMF generator",
     "Add direction router for one bidirectional plugin/API"
   ],
@@ -126,10 +125,10 @@
     }
   ],
   "kaggle": {
-    "checked_utc": "2026-10-21T08:35:00Z",
+    "checked_utc": "2026-10-21T12:45:00Z",
     "dapi_job": "pretrain_running",
     "reason": "kernel v5 running; steady ~1.7 s/step at 512",
-    "gpu_remaining_hours": 29.99,
+    "gpu_remaining_hours": 25.9,
     "quota_refresh": "2026-10-24T00:00:00",
     "old_kernels": [
       "bikasash/he-dapi-product-gpu-train",
@@ -144,6 +143,7 @@
       "note": "20 steps in ~39s; 40-epoch plan replaced by 20 epochs + 1024 fine-tune"
     },
     "pretrain_epoch": 10,
-    "pretrain_total_epochs": 20
+    "pretrain_total_epochs": 20,
+    "pretrain_eta_utc": "2026-10-21T17:25:00Z"
   }
 }
