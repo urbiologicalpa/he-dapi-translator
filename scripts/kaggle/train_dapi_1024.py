@@ -151,18 +151,20 @@ def main() -> None:
     else:
         config = ROOT / "configs/hemit_dapi_1024.yaml"
         seed = CKPT_ROOT / "dapi_pretrain/checkpoint_last.pt"
-        restart = seed.exists()
-        if not restart:
+        if not seed.exists():
             incoming = find_input_checkpoint()
             if incoming:
                 seed = incoming
-        if not any(ckpt_dir.glob("checkpoint_*.pt")) and seed.exists():
+        starting_fresh = not any(ckpt_dir.glob("checkpoint_*.pt"))
+        if starting_fresh:
+            if not seed.exists():
+                print("FATAL fine-tune needs a pretrain checkpoint")
+                sys.exit(2)
             shutil.copy2(seed, ckpt_dir / "checkpoint_last.pt")
             print(f"initialized 1024 from {seed}")
-            if restart:
-                extra = ["--resume", str(ckpt_dir / "checkpoint_last.pt"), "--resume-epoch", "0", "--epochs", "2", "--max-steps", "500"]
-            else:
-                extra = ["--resume", "auto"]
+            # Pretrain checkpoint has a high epoch counter; reset it so fine-tune
+            # actually runs epochs 1..2 at the lower 1024 LR.
+            extra = ["--resume", str(ckpt_dir / "checkpoint_last.pt"), "--resume-epoch", "0", "--epochs", "2", "--max-steps", "500"]
         else:
             extra = ["--resume", "auto", "--epochs", "2", "--max-steps", "500"]
 
