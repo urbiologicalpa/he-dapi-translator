@@ -1,6 +1,6 @@
 # Kaggle DAPI runbook and status
 
-Last checked: **2026-10-21 12:58 UTC**
+Last checked: **2026-10-21 13:28 UTC**
 
 ## Current status
 
@@ -15,12 +15,13 @@ Last checked: **2026-10-21 12:58 UTC**
 - Smoke kernel `bikasash/he-dapi-dapi-1024-corrected` passed:
   - T4, torch 2.11.0+cu128
   - 20 steps in ~39s at 512px, batch 2: **~1.96 s/step, ~1 sample/s**
-- Kernel **v5** is running the 512 pretrain with `train_dapi_pretrain.py`.
-  - At `12:56 UTC`: **epoch 18/20**, ~7 min/epoch steady state
-  - Checkpoints save every epoch under `/kaggle/working/checkpoints/dapi_pretrain/`
-  - Pretrain ETA: **~13:10 UTC** after warm-up/caching; much faster than the
-    initial 26.5 min/epoch estimate
-- Revised target: 20 epochs at 512 (~2.5h), then 2×500 steps at 1024 (~1–2h).
+- **512 pretrain complete** at ~`13:09 UTC` (epoch 20/20).
+  - Checkpoint: `checkpoints/dapi_pretrain/checkpoint_last.pt`
+  - SHA-256: `be0b2892cf91f8e00ae844aa2ae349986414dd0a46da657d0ef6fa2aedf4abf4`
+  - Uploaded as private dataset `bikasash/he-dapi-dapi-pretrain-ckpt`
+- **1024 fine-tune** launched as kernel **v6** with `train_dapi_finetune.py`;
+  currently `QUEUED` for a GPU worker.
+  - 2×500 steps at native 1024 from the pretrain checkpoint.
 - Test H5 is **not attached** to the pretrain kernel; attach
   `bikasash/hemit-dapi-1024-ch0-test` for final test eval.
 - GPU quota at launch: **~29.9h**, refresh `2026-10-24T00:00:00`.
@@ -217,6 +218,6 @@ both into `/kaggle/working`, and run the same command with the mounted H5 path.
 | Upload data dataset | ready (train/val) | test split in separate dataset |
 | Upload code dataset | ready | nested `code_bundle/` mount handled |
 | Kaggle smoke | **done** | ~1.96 s/step at 512, batch 2 |
-| 512 pretrain | **running** | kernel v5; epoch 18/20 at 12:56 UTC; ETA ~13:10 UTC |
-| 1024 fine-tune | pending | 2×500 steps |
+| 512 pretrain | **done** | epoch 20/20; checkpoint sha `be0b2892…f4abf4` |
+| 1024 fine-tune | **queued** | kernel v6; 2×500 steps from pretrain checkpoint |
 | Full val/test eval | pending | 630 / 945 |
