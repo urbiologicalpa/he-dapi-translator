@@ -1,7 +1,7 @@
 {
   "project": "he-dapi-translator",
-  "updated": "2026-10-21T08:35:00Z",
-  "status": "alpha; panCK ablation complete; corrected 1024 H5 built; Kaggle smoke passed; DAPI pretrain next",
+  "updated": "2026-10-21T08:45:00Z",
+  "status": "alpha; panCK ablation complete; corrected 1024 H5 built; 512 DAPI pretrain running on Kaggle",
   "overall_percent": 50,
   "machine": {
     "cpu": "Intel i5-10210U 8vCPU 4c/8t",
@@ -127,8 +127,8 @@
   ],
   "kaggle": {
     "checked_utc": "2026-10-21T08:35:00Z",
-    "dapi_job": "smoke_complete",
-    "reason": "pretrain not launched yet",
+    "dapi_job": "pretrain_running",
+    "reason": "kernel v5 running 20-epoch 512 pretrain",
     "gpu_remaining_hours": 29.99,
     "quota_refresh": "2026-10-24T00:00:00",
     "old_kernels": [

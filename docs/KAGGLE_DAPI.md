@@ -1,6 +1,6 @@
 # Kaggle DAPI runbook and status
 
-Last checked: **2026-10-21 08:35 UTC**
+Last checked: **2026-10-21 08:45 UTC**
 
 ## Current status
 
@@ -19,7 +19,8 @@ Last checked: **2026-10-21 08:35 UTC**
   - ~61 min/epoch at 3,717 samples
 - **40 epochs at 512 is not feasible.** Revised target: 20 epochs, split across
   sessions with checkpoint resume, then 2×500 steps at 1024.
-- GPU quota: **29.99h remaining**, refresh `2026-10-24T00:00:00`.
+- GPU quota: **~29.9h remaining**, refresh `2026-10-24T00:00:00`.
+- Pretrain launched as kernel **v5** with `train_dapi_pretrain.py`; checkpoints save every epoch.
 
 ## Why the run is staged
 
@@ -147,6 +148,6 @@ state-dict fallback before evaluating.
 | Upload data dataset | ready (train/val) | test split in separate dataset |
 | Upload code dataset | ready | nested `code_bundle/` mount handled |
 | Kaggle smoke | **done** | ~1.96 s/step at 512, batch 2 |
-| 512 pretrain | running/next | 20 epochs, resume across sessions |
+| 512 pretrain | **running** | kernel v5; 20 epochs, resume across sessions |
 | 1024 fine-tune | pending | 2×500 steps |
 | Full val/test eval | pending | 630 / 945 |
