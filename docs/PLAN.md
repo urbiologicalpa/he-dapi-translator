@@ -257,6 +257,18 @@ consequences. Add new entries; do not rewrite history.
 - **Consequences:** before any push, verify the bundle contents
   (`datasets.py` fixed, no `data/`), not just the local files.
 
+### ADR-013 — A kernel wrapper is not a run until it has a main guard and logs (2026-10-22)
+- **Context:** the corrected Kaggle wrapper defined `main()` but omitted
+  `if __name__ == "__main__": main()`. v1/v2 showed `COMPLETE` in ~6s, no logs,
+  no output, and no GPU usage. The status looked successful.
+- **Decision:** every Kaggle wrapper must end with the main guard and be
+  smoke-tested locally (`python -m py_compile`, run with `--help`/dry path).
+  A `COMPLETE` status with no log/output/GPU delta is treated as a failed run.
+- **Why:** status alone is not evidence; the queued/complete state can hide a
+  wrapper that never called the work.
+- **Consequences:** v3 added the guard and was confirmed by quota consumption;
+  future kernel pushes check `kaggle quota` + logs/output, not just status.
+
 ---
 
 ## 5. Run registry (append-only)
@@ -267,8 +279,8 @@ consequences. Add new entries; do not rewrite history.
 | R-002 | 2026-10-21 | Kaggle T4 | forward DAPI paired 512→1024 | complete, undertrained | `docs/RESULTS.md` |
 | R-003 | 2026-10-21/22 | Kaggle T4 | reverse H&E paired 512→1024 | complete, undertrained | `docs/RESULTS.md` |
 | R-004 | 2026-10-22 | Kaggle T4 | CycleGAN MHIST H&E | complete, negative/confounded | `docs/metrics_dapi2he_cyclegan_256.json` |
-| R-005 | 2026-10-22 14:25 | Kaggle T4 | CycleGAN HEMIT (stale bundle) | **INVALID, cancel** | `LIVE_STATE.md` §4 |
-| R-006 | 2026-10-22 16:42 | Kaggle T4 | CycleGAN HEMIT corrected 256 | **QUEUED (v1)** | `bikasash/he-dapi-cyclegan-hemit-dapi2he-256`; code ds `bikasash/he-dapi-code-hemit-256` |
+| R-005 | 2026-10-22 14:25 | Kaggle T4 | CycleGAN HEMIT (stale bundle) | **INVALID, cancelled** | `LIVE_STATE.md` §4 |
+| R-006 | 2026-10-22 17:20 | Kaggle T4 | CycleGAN HEMIT corrected 256 | **RUNNING (v3)** | `bikasash/he-dapi-cyclegan-hemit-dapi2he-256`; code ds `bikasash/he-dapi-code-hemit-256`; v1/v2 no-op (missing main guard) |
 
 ---
 

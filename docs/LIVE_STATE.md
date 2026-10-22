@@ -1,4 +1,4 @@
-# LIVE STATE — 2026-10-22 16:40 UTC
+# LIVE STATE — 2026-10-22 17:21 UTC
 
 > **Canonical strategy/decisions: [`docs/PLAN.md`](PLAN.md) v2.0.**
 > **Read this file first after any WSL crash, reboot, or "what is running?" question.**
@@ -12,37 +12,38 @@
 
 ## 1. Current stage
 
-| Item | State (verified 2026-10-22 16:24 UTC) |
+| Item | State (verified 2026-10-22 17:21 UTC) |
 |---|---|
 | Roadmap phase | **Phase 2 — Modeling** |
 | Sub-stage | **2.3 HEMIT-domain CycleGAN (DAPI→H&E) fair comparison** |
 | Primary compute | Kaggle T4, corrected kernel `bikasash/he-dapi-cyclegan-hemit-dapi2he-256` |
-| Primary run status | `QUEUED` (pushed 16:42 UTC); invalid 14:25 run still holds the T4 |
-| **Primary run validity** | Corrected kernel is queued; the RUNNING 14:25 kernel is **INVALID** (§4) |
+| Primary run status | `RUNNING` (v3, pushed 17:20 UTC; GPU quota confirms consumption) |
+| **Primary run validity** | Corrected v3 is valid by construction; verify its log when it exits. The 14:25 kernel is **CANCEL_ACKNOWLEDGED / INVALID** (§4) |
 | Local CPU run | **STOPPED** at ~step 50; WSL protected (see §3) |
-| Next stage | Cancel invalid Kaggle session → push corrected 256px run (§6) |
+| Next stage | Wait for v3; pull output, evaluate, then write the reverse selection memo |
 
-**The corrected kernel is queued behind the invalid 14:25 session. Stop the invalid
-session (web UI) so the queued run can start.**
+**The corrected v3 kernel is RUNNING on the T4; do not push another GPU run.**
 **Do not restart the local CPU run while swap free is below ~300MB.**
 
 ---
 
-## 2. What is running / not running now (verified 16:24 UTC)
+## 2. What is running / not running now (verified 17:21 UTC)
 
 ### Running
-- **Kaggle (invalid, stop me):** `bikasash/he-dapi-cyclegan-hemit-dapi2he-1024`
-  - Created/pushed: `2026-10-22 14:25:30 UTC`
-  - `kaggle kernels status` → `KernelWorkerStatus.RUNNING`
-  - Expected output dir: `/kaggle/working/checkpoints/hemit_cyclegan_dapi2he_1024/`
-  - Expected files: `checkpoint_epoch*.pt`, `checkpoint_last.pt`,
-    `cyclegan_G_last.pt`, `generator_last.pt`, `eval_cyclegan.json`
-  - **Known-invalid data mix; see §4.**
-
-### Queued
-- **Kaggle (corrected):** `bikasash/he-dapi-cyclegan-hemit-dapi2he-256`
-  - Pushed 2026-10-22 16:42 UTC, version 1, status `QUEUED`.
+- **Kaggle (corrected, v3):** `bikasash/he-dapi-cyclegan-hemit-dapi2he-256`
+  - Pushed 2026-10-22 17:20 UTC; status `RUNNING`.
+  - GPU quota moved 22.26h → 22.28h used, confirming a real GPU session.
   - Code dataset `bikasash/he-dapi-code-hemit-256` READY.
+  - v1/v2 were 6-second no-ops (missing `if __name__ == "__main__"` in the
+    wrapper); fixed before v3. Live logs are not exposed by the old API.
+  - Expected output: `/kaggle/working/checkpoints/hemit_cyclegan_dapi2he_256/`,
+    `cyclegan_G_last.pt`, `checkpoint_last.pt`, `eval_cyclegan.json`.
+
+### Cancelled
+- **Kaggle (invalid):** `bikasash/he-dapi-cyclegan-hemit-dapi2he-1024`
+  - Status `CANCEL_ACKNOWLEDGED` (confirmed 17:19 UTC). Earlier `RUNNING`
+    readings were API lag; the user's UI check was correct.
+  - Its metrics must not be used; see §4.
   - Will crop `hemit_{train,val}_1024.h5` to 256 in-kernel, train 10 epochs,
     then eval on `hemit_val_256.h5`.
   - URL: <https://www.kaggle.com/code/bikasash/he-dapi-cyclegan-hemit-dapi2he-256>
@@ -58,7 +59,7 @@ session (web UI) so the queued run can start.**
   30MB) is from an aborted run, has **no optimizer/D state**, and must **not**
   be resumed.
 
-### Memory state at 16:24 UTC
+### Memory state at 16:51 UTC
 ```
 Mem: 3807 total, 1941 used, 1866 available
 Swap: 1024 total, 1022 used, ~1 free
@@ -89,9 +90,9 @@ free recovers or the box is rebooted.
 
 ---
 
-## 4. Why the running Kaggle kernel is INVALID (evidence, not assumption)
+## 4. Why the 14:25 Kaggle kernel is INVALID (evidence, not assumption)
 
-The running kernel itself is fine, but the **code bundle it mounted is stale**.
+The kernel itself ran, but the **code bundle it mounted is stale**.
 
 - Code dataset: `bikasash/he-dapi-code-dapi-1024` (5,434,626 bytes,
   last updated `2026-10-22 14:23:48 UTC`).
@@ -237,7 +238,8 @@ swap pressure; do not start it on a box with full swap.
 5. Local unpaired checkpoints:
    `ls -lt resources/models/checkpoints/hemit_cyclegan_dapi2he_256/`.
 6. Kaggle:
-   `kaggle kernels status bikasash/he-dapi-cyclegan-hemit-dapi2he-1024`.
+   `kaggle kernels status bikasash/he-dapi-cyclegan-hemit-dapi2he-256` and
+   `...-1024` (expect `RUNNING`/`CANCEL_ACKNOWLEDGED` respectively).
 7. If the Kaggle session finished, pull output and evaluate before launching
    anything new.
 8. Update this file with the new state **before** the next launch.
@@ -254,6 +256,10 @@ swap pressure; do not start it on a box with full swap.
   session.
 - `2026-10-22 16:42 UTC` — Pushed corrected kernel version 1; status `QUEUED`
   behind the invalid 14:25 session. Git checkpoint `3a52ed8`.
+- `2026-10-22 17:21 UTC` — Invalid 14:25 kernel confirmed `CANCEL_ACKNOWLEDGED`.
+  v1/v2 of the corrected kernel exited in 6s because the wrapper lacked the
+  `if __name__ == "__main__"` guard; added it, pushed v3, and confirmed
+  `RUNNING` + GPU quota consumption. Added ADR-013.
 - `2026-10-22 16:40 UTC` — Added `docs/PLAN.md` v2.0 (stages, gates, ADR log,
   run registry). Marked `WORKPLAN.md` v1.1 historical. Reconciled
   TRACKER/progress/README status. Invalid session still RUNNING; corrected run

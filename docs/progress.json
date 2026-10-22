@@ -1,7 +1,7 @@
 {
   "project": "he-dapi-translator",
-  "updated": "2026-10-22T16:43:00Z",
-  "status": "alpha; corrected 256 HEMIT CycleGAN queued behind invalid stale-bundle run; reverse architecture selection pending",
+  "updated": "2026-10-22T17:22:00Z",
+  "status": "alpha; corrected 256 HEMIT CycleGAN RUNNING v3 on Kaggle T4; invalid 14:25 run cancelled; reverse selection pending",
   "overall_percent": 50,
   "machine": {
     "cpu": "Intel i5-10210U 8vCPU 4c/8t",
@@ -139,10 +139,10 @@
     }
   ],
   "kaggle": {
-    "checked_utc": "2026-10-22T16:43:00Z",
+    "checked_utc": "2026-10-22T17:22:00Z",
     "dapi_job": "baseline_complete",
     "reason": "512 pretrain + 1024 fine-tune + full 630/945 eval complete",
-    "gpu_remaining_hours": 23.69,
+    "gpu_remaining_hours": 7.72,
     "quota_refresh": "2026-10-24T00:00:00",
     "old_kernels": [
       "bikasash/he-dapi-product-gpu-train",
@@ -215,21 +215,21 @@
       }
     },
     "unpaired_job": {
-      "status": "invalid_running",
+      "status": "invalid_cancelled",
       "kernel": "bikasash/he-dapi-cyclegan-hemit-dapi2he-1024",
       "reason": "stale 2026-10-22T14:23 code bundle; UnpairedDataset fell back to data/examples ~50%",
       "action": "cancel; metrics must not be used",
       "corrected": {
-        "status": "queued",
+        "status": "running",
         "kernel": "bikasash/he-dapi-cyclegan-hemit-dapi2he-256",
         "code_dataset": "bikasash/he-dapi-code-hemit-256",
         "staging": "/tmp/kaggle_kernel_hemit256",
         "config": "configs/cyclegan_hemit_dapi2he_kaggle.yaml",
         "data": "hemit_{train,val}_1024.h5 cropped to 256 in-kernel",
         "budget_hours": 1.5,
-        "version": 1,
-        "pushed_utc": "2026-10-22T16:42:00Z",
-        "blocked_by": "bikasash/he-dapi-cyclegan-hemit-dapi2he-1024 RUNNING"
+        "version": 3,
+        "pushed_utc": "2026-10-22T17:20:00Z",
+        "note": "v1/v2 exited in ~6s because wrapper lacked if __name__ == \"__main__\"; v3 fixed and confirmed by GPU quota consumption"
       }
     }
   }

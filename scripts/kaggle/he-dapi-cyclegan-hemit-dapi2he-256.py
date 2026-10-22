@@ -141,3 +141,7 @@ def main() -> None:
         print(p.name, f"{p.stat().st_size / 1e6:.1f} MB")
     if result.returncode:
         raise SystemExit(result.returncode)
+
+
+if __name__ == "__main__":
+    main()
