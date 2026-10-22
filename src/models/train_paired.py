@@ -303,6 +303,8 @@ def main():
                             indices=indices,
                             max_cache_mb=train_cfg.get("max_cache_mb",4))
     loader_batch = args.batch_size or train_cfg.get("batch_size",2)
+    if args.dummy:
+        loader_batch = 1  # keep the smoke test inside the 3GB address-space cap
     # oom guard: advise down
     if mon:
         advised = mon.advise_batch(loader_batch)
