@@ -252,10 +252,32 @@ PYTHONPATH=. .venv/bin/python -m src.models.eval_offline \
   --out docs/metrics_dapi_1024_test.json
 ```
 
-`eval_offline.py` expects a training checkpoint with a `"G"` key, so use
-`checkpoint_last.pt` (or add a state-dict fallback). For Kaggle test eval,
-attach `bikasash/hemit-dapi-1024-ch0-test` plus the checkpoint dataset, copy
-both into `/kaggle/working`, and run the same command with the mounted H5 path.
+`eval_offline.py` accepts `checkpoint_last.pt` (wrapped `"G"`), a bare generator
+state dict, and CycleGAN `net.*` weights (auto-selects `ResnetGenerator`). For
+Kaggle test eval, attach `bikasash/hemit-dapi-1024-ch0-test` plus the checkpoint
+dataset, copy both into `/kaggle/working`, and run the same command with the
+mounted H5 path.
+
+### 5a. Quality, unpaired and CPU eval kernels
+
+| Kernel | Purpose | GPU | Sources |
+|---|---|---|---|
+| `bikasash/he-dapi-dapi2he-quality-1024` | reverse quality fine-tune | yes | data, code, `he-dapi-dapi2he-finetune-ckpt` |
+| `bikasash/he-dapi-he2dapi-quality-1024` | forward quality fine-tune | yes | data, code, `he-dapi-dapi-finetune-ckpt` |
+| `bikasash/he-dapi-cyclegan-dapi2he-1024` | unpaired CycleGAN | yes | data, `mhist-he-256`, code |
+| `bikasash/he-dapi-*-quality-eval-cpu` | FID/LPIPS on kernel output | no | data, code, `kernel_sources: <train kernel>` |
+
+The quality kernels use `train_dapi_quality.py` with `STAGE="quality"` and
+`DIRECTION` set to `dapi2he` or `he2dapi`; configs are
+`configs/hemit_{dapi2he,dapi}_quality_1024.yaml`. The unpaired kernel runs
+`train_unpaired.py` (`configs/cyclegan_dapi2he.yaml`) with MHIST H&E (256px) as
+the external domain and evaluates the last generator on `hemit_val_1024.h5`.
+Kaggle allows two concurrent GPU sessions: queue the unpaired kernel after a
+quality kernel finishes.
+
+The CPU eval kernels (`scripts/kaggle/eval_checkpoint.py`) depend on the
+training kernel via `kernel_sources`, enable internet for Inception/LPIPS
+weights, and write `/kaggle/working/metrics_eval.json`.
 
 ## Tracking table
 
