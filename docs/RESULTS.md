@@ -91,10 +91,20 @@ paired HEMIT data and budget as forward. Checkpoint:
 
 This is **not release quality**. The low SSIM/PSNR indicates blur and/or color
 mismatch, and only 1,000 steps were run at 1024. Dice is intentionally `null`
-for RGB H&E; we still need H&E-specific FID/LPIPS or segmentation-based metrics.
-The next pass should inspect qualitative grids, then test longer 1024
+for RGB H&E. The next pass inspects qualitative grids, then tests longer 1024
 fine-tuning plus perceptual/color losses before comparing against unpaired
 CycleGAN/CUT.
+
+FID + LPIPS (50 val crops, 512px, Inception pool3 / AlexNet):
+
+| Run | Target | val FID ↓ | val LPIPS ↓ | PSNR | SSIM |
+|---|---|---:|---:|---:|---:|
+| Forward 1024 baseline | DAPI ch0 | 77.14 | 0.1407 | 33.88 | 0.728 |
+| Reverse 1024 baseline | H&E | 313.18 | 0.6051 | 13.25 | 0.496 |
+
+The reverse FID/LPIPS are far worse than forward, consistent with the low
+output contrast (fake std ≈ 0.09 vs real ≈ 0.18). JSON:
+`docs/metrics_dapi_1024_baseline.json`, `docs/metrics_dapi2he_1024_baseline.json`.
 
 This is **not** paper-level: paper U-Net is SSIM 0.791 / Pearson 0.659.
 The val/test gap is large and likely reflects slide/domain differences plus
