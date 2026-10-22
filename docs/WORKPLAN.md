@@ -2,6 +2,11 @@
 Version: 1.1 | Date: 2026-10-20 | Author: OpenCode + User
 Location: `/home/bikash/he-dapi-translator`
 
+> **SUPERSEDED 2026-10-22 by [`docs/PLAN.md`](PLAN.md) v2.0.**
+> This file is kept as history. Do not follow its unchecked boxes or timeline;
+> the canonical gates, decisions, and current stage are in `PLAN.md`, and the
+> live run is in `LIVE_STATE.md`.
+
 ## 0. Goal
 Build a non-on-premise (cloud-ready, Dockerized) tool where user drags H&E image -> synthetic DAPI and vice versa. Must handle BOTH:
 - Single patch (256x256 / 512x512 / 1024x1024) for quick demo

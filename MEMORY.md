@@ -1,5 +1,16 @@
 # MEMORY - H&E <-> DAPI Session Checkpoint 2026-09-27
 
+> **2026-10-22 PLAN v2.0 → `docs/PLAN.md`; LIVE STATE → `docs/LIVE_STATE.md`.**
+> Read the plan for stages/decisions and the live file before any launch or
+> after any crash. Current: Phase 2 HEMIT CycleGAN; local run STOPPED (swap
+> 1021/1024MB); Kaggle `bikasash/he-dapi-cyclegan-hemit-dapi2he-1024` RUNNING but
+> **INVALID** (stale code bundle mixes `data/examples` 50/50) — cancel before
+> relaunch. Corrected 256px run is staged: code dataset
+> `bikasash/he-dapi-code-hemit-256` READY, kernel
+> `bikasash/he-dapi-cyclegan-hemit-dapi2he-256` in `/tmp/kaggle_kernel_hemit256/`.
+> Local fix: H5-only `datasets.py`, grad checkpointing, 2.5GB cgroup launcher.
+> Snapshot: `bash scripts/status.sh`.
+
 > **2026-10-20 correction:** HEMIT labels are `ch0=DAPI, ch1=CD3, ch2=panCK`.
 > The previous 512px pipeline used `ch2`, so the epoch-199/200 run, current HF
 > weights, demo, and `docs/metrics_eval.json` are a **panCK ablation, not DAPI**.

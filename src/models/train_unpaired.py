@@ -6,16 +6,18 @@ CUT variant: single G + NCE loss (simpler, less hallucination)
 Run:
   python src/models/train_unpaired.py --config configs/cyclegan_dapi2he.yaml --dummy
 """
-import argparse, time, yaml
+import argparse, os, time, yaml
 from pathlib import Path
 import torch, torch.nn as nn
 from torch.utils.data import DataLoader
+from torch.utils.checkpoint import checkpoint
 from .datasets import UnpairedDataset
 
 class ResnetGenerator(nn.Module):
     """ResNet generator for CycleGAN: 1ch DAPI -> 3ch HE (or vice versa). Simplified 6 blocks."""
-    def __init__(self, in_ch=1, out_ch=3, ngf=64, n_blocks=6):
+    def __init__(self, in_ch=1, out_ch=3, ngf=64, n_blocks=6, grad_checkpoint=False):
         super().__init__()
+        self.grad_checkpoint = grad_checkpoint
         layers = [
             nn.Conv2d(in_ch, ngf, 7,1,3), nn.InstanceNorm2d(ngf), nn.ReLU(True),
             nn.Conv2d(ngf, ngf*2, 3,2,1), nn.InstanceNorm2d(ngf*2), nn.ReLU(True),
@@ -29,7 +31,17 @@ class ResnetGenerator(nn.Module):
             nn.Conv2d(ngf, out_ch, 7,1,3), nn.Tanh()
         ]
         self.net = nn.Sequential(*layers)
-    def forward(self,x): return (self.net(x)+1)/2  # -> [0,1] for HE, careful for DAPI side handle outside
+    def forward(self,x):
+        # Recompute each residual block during backward on the low-RAM box.
+        # Keeps the 9-block architecture identical while cutting activation
+        # memory by roughly 1GB (the 2026-10-22 WSL crash was RAM/commit).
+        cp = self.grad_checkpoint and self.training and torch.is_grad_enabled()
+        for layer in self.net:
+            if cp and isinstance(layer, ResBlock):
+                x = checkpoint(layer, x, use_reentrant=False)
+            else:
+                x = layer(x)
+        return (x+1)/2  # -> [0,1] for HE, careful for DAPI side handle outside
 
 class ResBlock(nn.Module):
     def __init__(self, ch):
@@ -107,35 +119,41 @@ def train_dummy(monitor=None, batch_size=2, grad_accum=1):
 
 
 def _cyclegan_step(G, F, D_he, D_dapi, optimG, optimD, he01, dapi01,
-                   weights, grad_accum, step, device):
+                   weights, grad_accum, step, device, scaler=None, use_amp=False):
     """One CycleGAN step. Domains are [0,1]; generators return [0,1]."""
     mse = nn.MSELoss()
     l1 = nn.L1Loss()
+    amp = lambda: torch.amp.autocast("cuda", dtype=torch.float16, enabled=use_amp)
 
-    fake_he = G(dapi01)
-    fake_dapi = F(he01)
-    rec_dapi = F(fake_he)
-    rec_he = G(fake_dapi)
-    # Identity loss only makes sense when both domains have the same channel
-    # count. DAPI(1) -> H&E(3) is asymmetric, so it is disabled (weight 0).
-    if he01.shape[1] == dapi01.shape[1]:
-        id_he = G(he01)
-        id_dapi = F(dapi01)
-        loss_id = l1(id_he, he01) + l1(id_dapi, dapi01)
-    else:
-        loss_id = torch.zeros((), device=device)
+    with amp():
+        fake_he = G(dapi01)
+        fake_dapi = F(he01)
+        rec_dapi = F(fake_he)
+        rec_he = G(fake_dapi)
+        # Identity loss only makes sense when both domains have the same channel
+        # count. DAPI(1) -> H&E(3) is asymmetric, so it is disabled (weight 0).
+        if he01.shape[1] == dapi01.shape[1]:
+            id_he = G(he01)
+            id_dapi = F(dapi01)
+            loss_id = l1(id_he, he01) + l1(id_dapi, dapi01)
+        else:
+            loss_id = torch.zeros((), device=device)
 
     # --- Discriminators (detach generator outputs) ---
-    real_he = D_he(he01)
-    fake_he_d = D_he(fake_he.detach())
-    real_dapi = D_dapi(dapi01)
-    fake_dapi_d = D_dapi(fake_dapi.detach())
-    loss_D_he = 0.5 * (mse(real_he, torch.ones_like(real_he)) +
-                       mse(fake_he_d, torch.zeros_like(fake_he_d)))
-    loss_D_dapi = 0.5 * (mse(real_dapi, torch.ones_like(real_dapi)) +
-                         mse(fake_dapi_d, torch.zeros_like(fake_dapi_d)))
-    loss_D = (loss_D_he + loss_D_dapi) / grad_accum
-    loss_D.backward()
+    with amp():
+        real_he = D_he(he01)
+        fake_he_d = D_he(fake_he.detach())
+        real_dapi = D_dapi(dapi01)
+        fake_dapi_d = D_dapi(fake_dapi.detach())
+        loss_D_he = 0.5 * (mse(real_he, torch.ones_like(real_he)) +
+                           mse(fake_he_d, torch.zeros_like(fake_he_d)))
+        loss_D_dapi = 0.5 * (mse(real_dapi, torch.ones_like(real_dapi)) +
+                             mse(fake_dapi_d, torch.zeros_like(fake_dapi_d)))
+        loss_D = (loss_D_he + loss_D_dapi) / grad_accum
+    if scaler is not None and scaler.is_enabled():
+        scaler.scale(loss_D).backward()
+    else:
+        loss_D.backward()
 
     # --- Generators ---
     # Freeze D parameters so the generator loss only produces gradients for
@@ -144,22 +162,30 @@ def _cyclegan_step(G, F, D_he, D_dapi, optimG, optimD, he01, dapi01,
         p.requires_grad_(False)
     for p in D_dapi.parameters():
         p.requires_grad_(False)
-    d_he_fake = D_he(fake_he)
-    d_dapi_fake = D_dapi(fake_dapi)
-    loss_G_gan = (mse(d_he_fake, torch.ones_like(d_he_fake)) +
-                  mse(d_dapi_fake, torch.ones_like(d_dapi_fake)))
+    with amp():
+        d_he_fake = D_he(fake_he)
+        d_dapi_fake = D_dapi(fake_dapi)
+        loss_G_gan = (mse(d_he_fake, torch.ones_like(d_he_fake)) +
+                      mse(d_dapi_fake, torch.ones_like(d_dapi_fake)))
     for p in D_he.parameters():
         p.requires_grad_(True)
     for p in D_dapi.parameters():
         p.requires_grad_(True)
-    loss_cycle = l1(rec_dapi, dapi01) + l1(rec_he, he01)
-    loss_G = (weights["gan"] * loss_G_gan +
-              weights["cycle"] * loss_cycle +
-              weights["identity"] * loss_id) / grad_accum
-    loss_G.backward()
+    with amp():
+        loss_cycle = l1(rec_dapi, dapi01) + l1(rec_he, he01)
+        loss_G = (weights["gan"] * loss_G_gan +
+                  weights["cycle"] * loss_cycle +
+                  weights["identity"] * loss_id) / grad_accum
+    if scaler is not None and scaler.is_enabled():
+        scaler.scale(loss_G).backward()
+    else:
+        loss_G.backward()
 
     if (step + 1) % grad_accum == 0:
-        optimD.step(); optimG.step()
+        if scaler is not None and scaler.is_enabled():
+            scaler.step(optimD); scaler.step(optimG); scaler.update()
+        else:
+            optimD.step(); optimG.step()
         optimD.zero_grad(); optimG.zero_grad()
 
     return {
@@ -177,6 +203,8 @@ def train_cyclegan(cfg, args, mon=None):
     loss_cfg = cfg.get("model", {}).get("loss", {})
     gen_cfg = cfg.get("model", {}).get("generator", {})
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == "cuda":
+        torch.backends.cudnn.benchmark = True
     print(f"[CycleGAN] device {device}")
 
     ds = UnpairedDataset(
@@ -188,6 +216,19 @@ def train_cyclegan(cfg, args, mon=None):
     )
     if len(ds) == 0:
         raise SystemExit("unpaired dataset is empty")
+    synthetic = bool(getattr(ds, "_he_synthetic", False) or getattr(ds, "_dapi_synthetic", False))
+    if synthetic and not getattr(args, "dummy", False):
+        raise SystemExit(
+            "FATAL: unpaired domain has no real files/H5 (would train on random noise). "
+            "Check he_root/he_h5_fallback and dapi_h5_fallback."
+        )
+    sample = ds[0]
+    he0 = sample["he"]; dapi0 = sample["dapi"]
+    he_std = float(getattr(he0, "float", lambda: he0)().std())
+    dapi_std = float(getattr(dapi0, "float", lambda: dapi0)().std())
+    print(f"[DATA] HE {tuple(he0.shape)} std {he_std:.3f} | "
+          f"DAPI {tuple(dapi0.shape)} std {dapi_std:.3f} | synthetic={synthetic}")
+    ds._close_h5()  # keep the dataset picklable for DataLoader workers
     batch_size = args.batch_size or train_cfg.get("batch_size", 2)
     grad_accum = args.grad_accum or train_cfg.get("grad_accum", 1)
     if mon:
@@ -195,13 +236,21 @@ def train_cyclegan(cfg, args, mon=None):
         if advised < batch_size:
             print(f"[OOM GUARD] batch {batch_size}->{advised}")
             batch_size = advised
+    num_workers = int(train_cfg.get("num_workers", 0))
     loader = DataLoader(ds, batch_size=batch_size, shuffle=True,
-                        num_workers=train_cfg.get("num_workers", 0), drop_last=True)
+                        num_workers=num_workers, drop_last=True,
+                        pin_memory=(device.type == "cuda"),
+                        persistent_workers=num_workers > 0)
 
     ngf = gen_cfg.get("ngf", 64)
     n_blocks = gen_cfg.get("n_blocks", 9)
-    G = ResnetGenerator(1, 3, ngf=ngf, n_blocks=n_blocks).to(device)  # DAPI -> HE
-    F = ResnetGenerator(3, 1, ngf=ngf, n_blocks=n_blocks).to(device)  # HE -> DAPI
+    grad_checkpoint = bool(train_cfg.get("grad_checkpoint", False))
+    if grad_checkpoint:
+        print("[LOWRAM] generator gradient checkpointing enabled")
+    G = ResnetGenerator(1, 3, ngf=ngf, n_blocks=n_blocks,
+                        grad_checkpoint=grad_checkpoint).to(device)  # DAPI -> HE
+    F = ResnetGenerator(3, 1, ngf=ngf, n_blocks=n_blocks,
+                        grad_checkpoint=grad_checkpoint).to(device)  # HE -> DAPI
     D_he = PatchDiscriminator(3).to(device)
     D_dapi = PatchDiscriminator(1).to(device)
     optimG = torch.optim.Adam(list(G.parameters()) + list(F.parameters()),
@@ -213,6 +262,10 @@ def train_cyclegan(cfg, args, mon=None):
         "cycle": loss_cfg.get("cycle_weight", 10.0),
         "identity": loss_cfg.get("identity_weight", 5.0),
     }
+    use_amp = bool(train_cfg.get("mixed_precision", False)) and device.type == "cuda"
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp) if use_amp else None
+    if use_amp:
+        print("[AMP] mixed precision fp16 enabled (T4)")
 
     ckpt_dir = Path(train_cfg.get("checkpoint_dir", "resources/models/checkpoints/dapi2he"))
     ckpt_dir.mkdir(parents=True, exist_ok=True)
@@ -263,7 +316,8 @@ def train_cyclegan(cfg, args, mon=None):
                 he01 = (batch["he"].to(device) + 1) / 2  # [-1,1] -> [0,1]
                 dapi01 = batch["dapi"].to(device)         # [0,1]
                 stats = _cyclegan_step(G, F, D_he, D_dapi, optimG, optimD,
-                                       he01, dapi01, weights, grad_accum, step, device)
+                                       he01, dapi01, weights, grad_accum, step, device,
+                                       scaler=scaler, use_amp=use_amp)
                 for k in acc:
                     acc[k] += stats[k]
                 seen += 1
@@ -282,7 +336,10 @@ def train_cyclegan(cfg, args, mon=None):
                     continue
                 raise RuntimeError(f"step {step}: {exc}") from exc
         if seen and seen % grad_accum != 0:
-            optimD.step(); optimG.step()
+            if scaler is not None and scaler.is_enabled():
+                scaler.step(optimD); scaler.step(optimG); scaler.update()
+            else:
+                optimD.step(); optimG.step()
             optimD.zero_grad(); optimG.zero_grad()
         denom = max(seen, 1)
         print(f"[Epoch {epoch+1}/{epochs}] G {acc['g']/denom:.4f} D {acc['d']/denom:.4f} "
@@ -300,8 +357,16 @@ def train_cyclegan(cfg, args, mon=None):
             }
             tmp = ckpt_dir / f".tmp_checkpoint_epoch{epoch+1}.pt"
             torch.save(ckpt, tmp)
-            tmp.rename(ckpt_dir / f"checkpoint_epoch{epoch+1}.pt")
-            torch.save(ckpt, ckpt_dir / "checkpoint_last.pt")
+            epoch_path = ckpt_dir / f"checkpoint_epoch{epoch+1}.pt"
+            tmp.rename(epoch_path)
+            # Hardlink instead of saving a second 280MB copy. On this 3.7GB box
+            # the duplicate write pushed the cgroup into reclaim right after an
+            # epoch and stalled training for minutes.
+            last_tmp = ckpt_dir / ".tmp_checkpoint_last.pt"
+            if last_tmp.exists():
+                last_tmp.unlink()
+            os.link(epoch_path, last_tmp)
+            last_tmp.replace(ckpt_dir / "checkpoint_last.pt")
             print(f"[CHECKPOINT] Epoch {epoch+1} -> {ckpt_dir / 'checkpoint_last.pt'}", flush=True)
 
     for name, state in (("cyclegan_G_last.pt", G.state_dict()),

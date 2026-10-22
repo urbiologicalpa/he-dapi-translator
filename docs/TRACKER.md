@@ -1,78 +1,78 @@
-# Progress tracker — 2026-10-21
+# Progress tracker — 2026-10-22
 
-> Canonical short status. Machine-readable counterpart: `docs/progress.json`.
-> Detailed pre-2026-10-20 logs remain in git history and `MEMORY.md`.
+> **Canonical plan: [`docs/PLAN.md`](PLAN.md) v2.0.** Live run and recovery:
+> [`docs/LIVE_STATE.md`](LIVE_STATE.md). This file is the short status only.
+> Machine-readable counterpart: `docs/progress.json`.
 
-## Critical correction
+## Critical correction (still in force)
 
 HEMIT label TIFFs are **ch0=DAPI, ch1=CD3, ch2=panCK**. The previous pipeline
-used `ch2` as the target. Consequences:
-
-- The epoch-199/200 CPU run is an **H&E → panCK ablation**.
-- `docs/metrics_eval.json`, `generator_last.pt`, the HF weights, and the current
-  demo are **not DAPI**.
-- The bug is fixed in `scripts/data/pack_hemit.py`,
-  `scripts/data/pack_hemit_1024.py`, and `src/models/datasets.py`; regression
-  tests are in `tests/test_hemit_channels.py`.
-- Corrected 1024px HEMIT H5 has been built and verified for all splits.
+used `ch2`, so the epoch-199/200 CPU run, public HF weights, demo, and
+`docs/metrics_eval.json` are an **H&E → panCK ablation**, not DAPI. The data
+builders, loader, and tests are fixed; corrected 1024px H5 is built for all
+splits. Do not present the public weights as DAPI.
 
 ## Live runs
 
 | Run | Status | Details |
 |---|---|---|
-| Local CPU, 512px | **Complete** | Epoch 200 finished 2026-10-20 19:34 UTC; full 630/945 panCK eval recorded. Do not treat as DAPI. |
-| Kaggle T4 | DAPI baseline complete | 512 pretrain + 1024 fine-tune + full 630/945 eval done. Next: reverse paired. |
-| Corrected 1024px DAPI | Baseline done, undertrained | val/test SSIM 0.670/0.725, Pearson 0.255/0.611. |
-| DAPI → H&E | First baseline done | 20/20 @512 + 2×500 @1024; val/test SSIM 0.437/0.593, Pearson 0.521/0.576. Undertrained; quality pass next. |
+| Local CPU, 512px panCK | **Complete/ablation** | 200 epochs; full 630/945 panCK eval. Not DAPI. |
+| Forward paired DAPI 1024 | **Complete, undertrained** | val/test SSIM 0.670/0.725, Pearson 0.255/0.611. |
+| Reverse paired H&E 1024 | **Complete, undertrained** | val/test SSIM 0.437/0.593, Pearson 0.521/0.576. |
+| CycleGAN MHIST H&E | **Complete, negative/confounded** | FID 362.34 vs paired 342.98; target domain differed. |
+| CycleGAN HEMIT (14:25) | **INVALID — cancel** | Stale code bundle mixed `data/examples`; do not use metrics. |
+| CycleGAN HEMIT corrected 256 | **Staged — launch next** | Code dataset `bikasash/he-dapi-code-hemit-256` READY; kernel `/tmp/kaggle_kernel_hemit256/`. |
 
-## Phases
+## Phases (evidence-gated; see PLAN.md)
 
-| Phase | Status | % | Reality check |
-|---|---|---:|---|
-| 0. Scoping / infra | Done | 100 | Repo, CI, Docker, packages exist |
-| 1. Data pipeline | Done, corrected | 100 | 5,292 HEMIT pairs; 512px legacy data has wrong target; 1024 builder ready |
-| 2. H&E → DAPI model | Baseline done | 60 | corrected DAPI baseline trained; undertrained; dual-branch not implemented |
-| 3. App / API | Alpha | 60 | FastAPI + React + Docker; model behind it is the ablation |
-| 4. Validation | Partial | 35 | Full 630/945 DAPI baseline + panCK ablation eval done; no CIs/qualitative audit yet |
-| 5. Deployment | Alpha | 55 | GHCR staging, PyPI/HF alpha; corrected weights and CPU benchmark pending |
+| Stage | Status | Reality check |
+|---|---|---|
+| 0. Truth & infra | **DONE** | CI, Docker, guards, channel regression tests. |
+| 1. Data contract | **DONE** | Corrected 1024 + derived 256 H5; no leakage; H5 authoritative. |
+| 2. Model baselines | **IN PROGRESS** | Forward/reverse paired done; fair unpaired comparison next; selection gate open. |
+| 3. Validation | **PARTIAL** | Full 630/945 paired metrics; CIs, blinded audit, failure analysis open. |
+| 4. Product integration | **ALPHA** | Router/API/UI/ONNX exist; public weights are still the ablation. |
+| 5. Release | **ALPHA** | Staging/hand manual prod gate; corrected weights/manifest pending. |
+| 6. Post-release | **NOT STARTED** | No monitoring/drift loop yet. |
 
-Overall is intentionally not presented as a single impressive percentage: the
-only completed model is the panCK ablation; DAPI training is still in progress.
+Overall is intentionally not a single percentage: the only fully completed
+model is the panCK ablation; corrected DAPI/H&E models are undertrained.
 
 ## Next actions
 
-1. DONE — qualitative reverse audit (`docs/qualitative_dapi2he/`).
-2. DONE (negative) — FID/LPIPS + colour/gradient quality pass ran; it did not
-   improve the reverse model (FID 313→335, SSIM 0.496→0.458). Keep baseline.
-3. IN PROGRESS — CycleGAN implemented; MHIST-domain run done but worse than
-   paired reverse (FID 363 vs 343, confounded target domain). HEMIT-domain rerun
-   `bikasash/he-dapi-cyclegan-hemit-dapi2he-1024` RUNNING for a fair comparison.
-4. DONE — auto direction router (`detect_direction`, threshold 0.06) in CLI/streaming/API.
-5. DONE (negative) — forward quality kernel completed; colour/gradient pass
-   degraded FID/LPIPS vs the baseline (see RESULTS.md). Baseline remains default;
-   val-based selection + dual-branch Swin/FMF still open.
-6. DONE — CPU/ONNX/INT8 benchmark; ship ONNX FP32 (`docs/BENCHMARK.md`).
+1. **Stop the invalid 14:25 Kaggle session**; launch the corrected 256 kernel;
+   verify `HE: 0 files + H5 …`, `synthetic=False`, CUDA true.
+2. Write `docs/selection_reverse.md` after the corrected run: paired vs
+   unpaired on **val** FID/LPIPS + blinded qualitative; choose the default.
+3. Spend the next GPU budget only on the selected architecture's quality pass
+   (2.5), with val-based checkpoint selection.
+4. Update the public README status (router and CycleGAN are implemented; public
+   weights remain the ablation) before any new claim.
+5. Rotate the Kaggle token exposed during auth debugging.
 
 ## Commands
 
 ```bash
-# status
-PYTHONPATH=. python -m src.utils.progress_tracker --check
-PYTHONPATH=. python -m src.utils.progress_tracker --enforce
-PYTHONPATH=. python -m pytest tests/test_hemit_channels.py tests/test_datasets.py -q
+# status snapshot (local + Kaggle)
+bash scripts/status.sh
 
-# corrected data
+# tests
+PYTHONPATH=. python -m pytest tests -q -m "not slow"
+
+# corrected data (already built)
 uv run --extra data python -m scripts.data.pack_hemit_1024 \
   --splits train val test --patch-size 1024 --compression gzip
 
-# corrected DAPI training (on GPU, after data upload)
-PYTHONPATH=. python -m src.models.train_paired \
-  --config configs/hemit_dapi_512_pretrain.yaml --resume auto --optimize-for full
-PYTHONPATH=. python -m src.models.train_paired \
-  --config configs/hemit_dapi_1024.yaml --resume auto --optimize-for full
+# local unpaired resume (only if SwapFree > 300MB)
+MAX_STEPS=300 EPOCHS=10 setsid nohup bash scripts/train_unpaired_safe.sh \
+  >> logs/train_unpaired.log 2>&1 < /dev/null &
+
+# corrected Kaggle run (after the invalid session is stopped)
+export KAGGLE_API_TOKEN="$(cat ~/.kaggle/api_token)"
+.venv/bin/kaggle kernels push -p /tmp/kaggle_kernel_hemit256
 ```
 
-Kaggle data/code upload, smoke, pretrain, and fine-tune steps are in
+Kaggle data/code upload, smoke, pretrain, and fine-tune history:
 [`docs/KAGGLE_DAPI.md`](KAGGLE_DAPI.md).
 
 ## Milestones kept
@@ -80,8 +80,10 @@ Kaggle data/code upload, smoke, pretrain, and fine-tune steps are in
 - 2026-08-31: initial HEMIT/maxpmx/MHIST extraction.
 - 2026-09-19: low-RAM streaming pass; 11 resource guards.
 - 2026-10-18: v0.1.0 GHCR release, HF demo, PyPI alpha packages.
-- 2026-10-20: DAPI channel-order correction; Kaggle T4 availability confirmed;
-  README/docs rewritten to match what is actually implemented.
-- 2026-10-21: corrected DAPI 512 pretrain + 1024 fine-tune + full 630/945 eval.
-  Baseline is undertrained. Added bidirectional trainer support and launched
-  paired reverse DAPI → H&E on Kaggle.
+- 2026-10-20: DAPI channel-order correction; Kaggle T4 confirmed; docs
+  rewritten to match implemented code.
+- 2026-10-21: corrected DAPI 512 pretrain + 1024 fine-tune + full 630/945 eval;
+  added bidirectional trainer and paired reverse run.
+- 2026-10-22: reverse paired baseline eval; WSL host OOM during unpaired run;
+  invalid stale-bundle Kaggle run identified; H5-authoritative loader,
+  grad-checkpointing, 2.5GB cgroup launcher; PLAN v2.0 and LIVE_STATE added.

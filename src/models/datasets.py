@@ -220,45 +220,62 @@ class UnpairedDataset(Dataset):
         self.he_root = Path(he_root) if he_root else Path("data/raw/mhist")
         self.dapi_root = Path(dapi_root) if dapi_root else Path("data/raw/hemit/dapi")
         self.patch_size = patch_size
+        self.augment = augment
         self.cache_size = cache_size
         self._he_cache = {}  # lru for decoded images if reused (not in random mode much)
         self._dapi_cache = {}
-        self.he_files = list(self.he_root.rglob("*.png")) + list(self.he_root.rglob("*.jpg")) + list(self.he_root.rglob("*.tif*")) if self.he_root.exists() else []
-        self.dapi_files = list(self.dapi_root.rglob("*.png")) + list(self.dapi_root.rglob("*.jpg")) + list(self.dapi_root.rglob("*.tif*")) if self.dapi_root.exists() else []
-        # if dapi_root is HDF5 (hemit), fallback to H5 sampling: use file list empty -> sample from H5
-        self._dapi_h5 = None
-        if dapi_h5 and Path(dapi_h5).exists():
-            self._dapi_h5 = str(dapi_h5)
-            print(f"[Unpaired] DAPI source HDF5 {dapi_h5}")
-        elif not self.dapi_files:
+
+        # An explicitly supplied H5 is authoritative: do NOT also glob the root
+        # or fall back to data/examples. Otherwise a config that says "H5-only"
+        # silently mixes in example/other-split images (and HEMIT labels).
+        self._he_h5 = str(he_h5) if he_h5 and Path(he_h5).exists() else None
+        self._dapi_h5 = str(dapi_h5) if dapi_h5 and Path(dapi_h5).exists() else None
+        if self._he_h5:
+            print(f"[Unpaired] HE source HDF5 {self._he_h5}")
+        if self._dapi_h5:
+            print(f"[Unpaired] DAPI source HDF5 {self._dapi_h5}")
+
+        if self._he_h5:
+            self.he_files = []
+        else:
+            self.he_files = list(self.he_root.rglob("*.png")) + list(self.he_root.rglob("*.jpg")) + list(self.he_root.rglob("*.tif*")) if self.he_root.exists() else []
+        if self._dapi_h5:
+            self.dapi_files = []
+        else:
+            self.dapi_files = list(self.dapi_root.rglob("*.png")) + list(self.dapi_root.rglob("*.jpg")) + list(self.dapi_root.rglob("*.tif*")) if self.dapi_root.exists() else []
+
+        if self._dapi_h5 is None and not self.dapi_files:
             # try HDF5 DAPI source (hemit_*.h5)
             for cand in [Path("data/processed/hemit_train_512.h5"), Path("data/processed/maxpmx_train_512.h5")]:
                 if cand.exists():
                     self._dapi_h5 = str(cand)
                     print(f"[Unpaired] DAPI fallback to HDF5 {cand} (no pngs in {self.dapi_root})")
                     break
-        if not self.he_files:
+        if self._he_h5 is None and not self.he_files:
             self.he_files = list(Path("data/examples").glob("he_*.png"))
-        if not self.dapi_files and not self._dapi_h5:
+        if self._dapi_h5 is None and not self.dapi_files:
             self.dapi_files = list(Path("data/examples").glob("dapi_*.png"))
-        if not self.he_files:
-            self.he_files = [None]*8  # synthetic
-        if not self.dapi_files and not self._dapi_h5:
-            self.dapi_files = [None]*8
-        # also support H5 for HE (mhist_*.h5) if no pngs
-        self._he_h5 = None
-        if he_h5 and Path(he_h5).exists():
-            self._he_h5 = str(he_h5)
-            print(f"[Unpaired] HE source HDF5 {he_h5}")
-        elif len(self.he_files) < 10:
+        # also support H5 for HE (mhist_*.h5) if there are only a few PNGs
+        if self._he_h5 is None and len(self.he_files) < 10:
             for cand in [Path("data/processed/mhist_512.h5"), Path("data/processed/mhist_256.h5")]:
                 if cand.exists():
                     self._he_h5 = str(cand)
                     print(f"[Unpaired] HE fallback to HDF5 {cand}")
                     break
+        # Keep only real paths. The old ``[None]*8`` sentinel made the 50/50
+        # H5-vs-files branch fall through to random noise on 50% of samples
+        # whenever the Kaggle bundle had no data/examples PNGs.
+        self._he_real_files = [str(p) for p in self.he_files if p]
+        self._dapi_real_files = [str(p) for p in self.dapi_files if p]
+        self._he_synthetic = not self._he_real_files and not self._he_h5
+        self._dapi_synthetic = not self._dapi_real_files and not self._dapi_h5
         self._he_n = self._h5_length(self._he_h5, "he")
         self._dapi_n = self._h5_length(self._dapi_h5, "dapi")
-        print(f"[Unpaired] HE: {len(self.he_files)} files {(' + H5 '+self._he_h5) if self._he_h5 else ''}, DAPI: {len(self.dapi_files)} files {(' + H5 '+self._dapi_h5) if self._dapi_h5 else ''} (low-RAM: no preload)")
+        print(f"[Unpaired] HE: {len(self._he_real_files)} files {(' + H5 '+self._he_h5) if self._he_h5 else ''}, DAPI: {len(self._dapi_real_files)} files {(' + H5 '+self._dapi_h5) if self._dapi_h5 else ''} (low-RAM: no preload)")
+        if self._he_synthetic:
+            print("[Unpaired] WARNING HE domain has no files/H5 -> synthetic noise")
+        if self._dapi_synthetic:
+            print("[Unpaired] WARNING DAPI domain has no files/H5 -> synthetic noise")
         self._he_h5_handle = None
         self._dapi_h5_handle = None
 
@@ -272,7 +289,31 @@ class UnpairedDataset(Dataset):
         except Exception:
             return 0
 
-    def __len__(self): return max(len(self.he_files), len(self.dapi_files), self._he_n, self._dapi_n)
+    def __len__(self):
+        n = max(len(self._he_real_files), len(self._dapi_real_files), self._he_n, self._dapi_n)
+        if n == 0 and (self._he_synthetic or self._dapi_synthetic):
+            return 8  # dummy/smoke fallback when no real source exists at all
+        return n
+
+    def _fit_patch(self, arr):
+        """Random/center crop native patches; resize only as a last resort.
+
+        The paired baseline center-crops 1024 -> 256. Resizing the full WSI
+        patch instead changes the object scale and confounds the comparison.
+        """
+        h, w = arr.shape[:2]
+        p = self.patch_size
+        if h == p and w == p:
+            return arr
+        if h >= p and w >= p:
+            if self.augment:
+                y = np.random.randint(0, h - p + 1)
+                x = np.random.randint(0, w - p + 1)
+            else:
+                y = (h - p) // 2
+                x = (w - p) // 2
+            return arr[y:y + p, x:x + p]
+        return np.array(Image.fromarray(arr).resize((p, p)))
 
     def _get_he_h5(self):
         if self._he_h5 and self._he_h5_handle is None and h5py:
@@ -282,35 +323,40 @@ class UnpairedDataset(Dataset):
         if self._dapi_h5 and self._dapi_h5_handle is None and h5py:
             self._dapi_h5_handle = h5py.File(self._dapi_h5, "r", libver="latest", swmr=True, rdcc_nbytes=4*1024*1024)
         return self._dapi_h5_handle
+    def _close_h5(self):
+        """Close per-process handles (h5py objects are not picklable)."""
+        for attr in ("_he_h5_handle", "_dapi_h5_handle"):
+            h = getattr(self, attr, None)
+            if h is not None:
+                try:
+                    h.close()
+                except Exception:
+                    pass
+                setattr(self, attr, None)
+
     def __del__(self):
-        for h in [self._he_h5_handle, self._dapi_h5_handle]:
-            try:
-                if h: h.close()
-            except Exception:
-                pass
+        self._close_h5()
 
     def __getitem__(self, idx):
-        rng_idx_he = idx % len(self.he_files) if self.he_files else 0
+        rng_idx_he = idx % len(self._he_real_files) if self._he_real_files else 0
         # Load HE - prefer H5 if available and random use it periodically to avoid PNG decompress spike
         he = None
-        if self._he_h5 and (not self.he_files or np.random.rand() < 0.5):  # H5 is the only source when no PNGs
+        if self._he_h5 and (not self._he_real_files or np.random.rand() < 0.5):  # H5 is the only source when no PNGs
             h5f = self._get_he_h5()
             if h5f is not None:
                 ri = np.random.randint(0, h5f["he"].shape[0])
                 he = h5f["he"][ri]
-                if he.shape[0] != self.patch_size:
-                    he = np.array(Image.fromarray(he).resize((self.patch_size, self.patch_size)))
+                he = self._fit_patch(he)
         if he is None:
-            he_p = self.he_files[rng_idx_he] if self.he_files else None
+            he_p = self._he_real_files[rng_idx_he] if self._he_real_files else None
             if he_p and Path(he_p).exists():
                 he = np.array(Image.open(he_p).convert("RGB"))
-                if he.shape[0]!=self.patch_size:
-                    he = np.array(Image.fromarray(he).resize((self.patch_size,self.patch_size)))
+                he = self._fit_patch(he)
             else:
                 he = np.random.randint(0,255,(self.patch_size,self.patch_size,3),dtype=np.uint8)
         # Load DAPI - similarly H5 path
         dapi = None
-        if self._dapi_h5 and (not self.dapi_files or np.random.rand() < 0.5):
+        if self._dapi_h5 and (not self._dapi_real_files or np.random.rand() < 0.5):
             h5f = self._get_dapi_h5()
             if h5f is not None:
                 ri = np.random.randint(0, h5f["dapi"].shape[0] if "dapi" in h5f else h5f["he"].shape[0])
@@ -319,15 +365,13 @@ class UnpairedDataset(Dataset):
                     if dapi.ndim==3: dapi = dapi[...,0]
                 else:
                     dapi = h5f["he"][ri][...,0]
-                if dapi.shape[0]!=self.patch_size:
-                    dapi = np.array(Image.fromarray(dapi).resize((self.patch_size,self.patch_size)))
+                dapi = self._fit_patch(dapi)
         if dapi is None:
-            rng_idx_dapi = np.random.randint(0, len(self.dapi_files)) if self.dapi_files else 0
-            dapi_p = self.dapi_files[rng_idx_dapi] if self.dapi_files else None
+            rng_idx_dapi = np.random.randint(0, len(self._dapi_real_files)) if self._dapi_real_files else 0
+            dapi_p = self._dapi_real_files[rng_idx_dapi] if self._dapi_real_files else None
             if dapi_p and Path(dapi_p).exists():
                 dapi = np.array(Image.open(dapi_p).convert("L"))
-                if dapi.shape[0]!=self.patch_size:
-                    dapi = np.array(Image.fromarray(dapi).resize((self.patch_size,self.patch_size)))
+                dapi = self._fit_patch(dapi)
             else:
                 dapi = np.random.randint(0,255,(self.patch_size,self.patch_size),dtype=np.uint8)
 

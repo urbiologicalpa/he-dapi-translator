@@ -1,0 +1,51 @@
+# Unpaired DAPI -> H&E with HEMIT H&E as the unpaired target domain.
+# Kaggle T4 profile: 256px LZF H5 (cropped in-kernel from the 1024 H5),
+# batch 4 x grad_accum 2 = effective 8, AMP on, no activation checkpointing.
+# Same target domain and 256px crop as the paired reverse model, so FID/LPIPS
+# is an apples-to-apples comparison.
+data:
+  name: unpaired_hemit_dapi2he
+  he_root: data/processed
+  dapi_root: data/processed/hemit_train_256.h5
+  patch_size: 256
+  stain_norm: none
+  unpaired: true
+  he_h5_fallback: data/processed/hemit_train_256.h5
+  dapi_h5_fallback: data/processed/hemit_train_256.h5
+
+model:
+  name: cyclegan
+  generator:
+    arch: resnet
+    n_blocks: 9
+    ngf: 64
+  discriminator:
+    arch: patchgan
+    ndf: 64
+  loss:
+    gan_weight: 1.0
+    cycle_weight: 10.0
+    identity_weight: 0.0  # DAPI(1ch)->H&E(3ch): identity mapping is undefined
+    nce_weight: 2.0
+    sacsi_weight: 1.0
+
+training:
+  epochs: 10
+  batch_size: 4
+  grad_accum: 2
+  num_workers: 2
+  log_every: 50
+  lr: 0.0002
+  mixed_precision: true
+  grad_checkpoint: false
+  dists_on_cpu: false
+  checkpoint_dir: resources/models/checkpoints/hemit_cyclegan_dapi2he_256
+  save_every: 1
+  resume: auto
+  oom_guard: true
+
+wsi_infer:
+  tile_size: 512
+  stride: 256
+  blend: gaussian
+  frequency_aware: true

@@ -1,15 +1,21 @@
 # Unpaired DAPI -> H&E with HEMIT H&E as the unpaired target domain.
-# Same data/domain as the paired reverse model, so FID/LPIPS against HEMIT val
-# is an apples-to-apples paired-vs-unpaired comparison.
+# HEMIT train split only (H5 is authoritative) so val/test never leak into the
+# unpaired pool. 256px center-crop keeps CPU reads small; same target domain as
+# the paired reverse model, so FID/LPIPS is an apples-to-apples comparison.
+#
+# Low-RAM profile for the 3.7GB WSL2 CPU box. The old batch=2 + num_workers=2
+# profile hard-crashed the whole WSL VM on 2026-10-22 (4 nets + worker copies
+# exceeded RAM/commit). batch=1 + grad_accum=8 keeps the effective batch at 8;
+# num_workers=0 avoids duplicating torch/H5 state in worker processes.
 data:
   name: unpaired_hemit_dapi2he
-  he_root: data/raw/hemit
-  dapi_root: data/processed/hemit_train_1024.h5
+  he_root: data/raw/hemit/extracted/train/input
+  dapi_root: data/processed/hemit_train_256.h5
   patch_size: 256
   stain_norm: none
   unpaired: true
-  he_h5_fallback: data/processed/hemit_train_1024.h5
-  dapi_h5_fallback: data/processed/hemit_train_1024.h5
+  he_h5_fallback: data/processed/hemit_train_256.h5
+  dapi_h5_fallback: data/processed/hemit_train_256.h5
 
 model:
   name: cyclegan
@@ -29,14 +35,15 @@ model:
 
 training:
   epochs: 10
-  batch_size: 2
-  grad_accum: 4
+  batch_size: 1
+  grad_accum: 8
   num_workers: 0
-  log_every: 100
+  log_every: 50
   lr: 0.0002
-  mixed_precision: false
+  mixed_precision: false  # CPU: AMP is a no-op/overhead on this box
+  grad_checkpoint: true   # recompute ResBlocks: ~1GB less activation RAM
   dists_on_cpu: false
-  checkpoint_dir: resources/models/checkpoints/hemit_cyclegan_dapi2he_1024
+  checkpoint_dir: resources/models/checkpoints/hemit_cyclegan_dapi2he_256
   save_every: 1
   resume: auto
   oom_guard: true
