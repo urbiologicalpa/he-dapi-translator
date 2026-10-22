@@ -40,6 +40,10 @@
     `cyclegan_G_last.pt`, `checkpoint_last.pt`, `eval_cyclegan.json`.
   - Status monitor: PID `7254`, log `logs/kaggle_256_monitor.log`
     (`scripts/watch_kaggle_256.sh`, 120s interval, exits on terminal status).
+  - Provenance verified 17:42 UTC: the mounted code dataset contains
+    `src/models/datasets.py` SHA-256 `4b74f294…` (identical to the local fixed
+    file), the H5-authoritative marker, and the Kaggle config
+    (`batch4 × accum2`, AMP on). No `data/` in the code dataset.
 
 ### Cancelled
 - **Kaggle (invalid):** `bikasash/he-dapi-cyclegan-hemit-dapi2he-1024`
