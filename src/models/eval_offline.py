@@ -103,7 +103,13 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
     bce = nn.BCEWithLogitsLoss()
 
     wanted = {m.strip().lower() for m in (metrics or []) if m}
-    fid = _InceptionFID() if "fid" in wanted else None
+    fid = None
+    if "fid" in wanted:
+        try:
+            fid = _InceptionFID()
+        except Exception as exc:  # offline kernel without pretrained weights
+            print(f"[METRICS] FID unavailable ({exc}); skipping")
+            wanted.discard("fid")
     lpips_fn = None
     if "lpips" in wanted:
         try:
