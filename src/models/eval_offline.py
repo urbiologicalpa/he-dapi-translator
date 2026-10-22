@@ -20,9 +20,44 @@ from torch.utils.data import DataLoader
 from skimage.metrics import structural_similarity
 
 
+def _as_3ch(x: torch.Tensor) -> torch.Tensor:
+    return x.repeat(1, 3, 1, 1) if x.shape[1] == 1 else x
+
+
+class _InceptionFID:
+    """Inception pool3 (2048-d) features for Frechet distance, torchvision only."""
+
+    def __init__(self):
+        from torchvision.models import inception_v3, Inception_V3_Weights
+        self.model = inception_v3(weights=Inception_V3_Weights.IMAGENET1K_V1,
+                                  transform_input=False, aux_logits=True)
+        self.model.fc = nn.Identity()
+        self.model.eval()
+
+    @torch.no_grad()
+    def features(self, x: torch.Tensor) -> np.ndarray:
+        x = _as_3ch(x.float())
+        x = torch.nn.functional.interpolate(x, size=(299, 299), mode="bilinear",
+                                            align_corners=False)
+        x = x * 2 - 1  # [0,1] -> [-1,1], the standard FID input range
+        return self.model(x).cpu().numpy()
+
+
+def _frechet_distance(a: np.ndarray, b: np.ndarray) -> float:
+    from scipy.linalg import sqrtm
+    mu1, mu2 = a.mean(0), b.mean(0)
+    sigma1 = np.cov(a, rowvar=False)
+    sigma2 = np.cov(b, rowvar=False)
+    covmean = sqrtm(sigma1 @ sigma2)
+    if np.iscomplexobj(covmean):
+        covmean = covmean.real
+    return float(((mu1 - mu2) ** 2).sum() + np.trace(sigma1 + sigma2 - 2 * covmean))
+
+
 def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
              h5_path: str = None, patch_size: int = 512, ngf: int = 64,
-             data_root: str = "data/raw/hemit", direction: str = None):
+             data_root: str = "data/raw/hemit", direction: str = None,
+             metrics: list[str] | None = None, metric_num: int = 50):
     from src.models.train_paired import UNetGenerator, PatchGANDiscriminator
     from src.models.datasets import PairedHEMITDataset
     from src.models.losses import SSIMLoss, NucleiDiceLoss
@@ -61,6 +96,21 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
     mse_fn = nn.MSELoss()
     bce = nn.BCEWithLogitsLoss()
 
+    wanted = {m.strip().lower() for m in (metrics or []) if m}
+    fid = _InceptionFID() if "fid" in wanted else None
+    lpips_fn = None
+    if "lpips" in wanted:
+        try:
+            import lpips  # noqa: F401
+            lpips_fn = lpips.LPIPS(net="alex")
+        except Exception as exc:  # optional dependency / offline weights
+            print(f"[METRICS] LPIPS unavailable ({exc}); skipping")
+            wanted.discard("lpips")
+    fid_real: list[np.ndarray] = []
+    fid_fake: list[np.ndarray] = []
+    lpips_vals: list[float] = []
+    metric_seen = 0
+
     L1 = SE_PSNR = SS = DICE = DL = 0.0
     SSIM_REAL = PEARSON = 0.0
     PEARSON_N = 0
@@ -80,6 +130,14 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
             SS += ssim_fn(fake, real).item()
             fake_np = fake[0].detach().cpu().numpy()
             real_np = real[0].detach().cpu().numpy()
+            if metric_seen < metric_num:
+                if fid is not None:
+                    fid_real.append(fid.features(real))
+                    fid_fake.append(fid.features(fake))
+                if lpips_fn is not None:
+                    lp = lpips_fn(_as_3ch(fake * 2 - 1), _as_3ch(real * 2 - 1))
+                    lpips_vals.append(float(lp.item()))
+                metric_seen += 1
             if fake_np.shape[0] == 1:
                 SSIM_REAL += float(structural_similarity(real_np[0], fake_np[0], data_range=1.0))
             else:
@@ -115,6 +173,11 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
         "val_SSIM_loss_proxy": round(SS / n, 4),
         "val_Dice_thresh01": round(DICE / n, 4) if direction == "he2dapi" else None,
         "val_D_loss": round(DL / n, 4),
+        "val_FID": (round(_frechet_distance(np.concatenate(fid_real),
+                                           np.concatenate(fid_fake)), 2)
+                    if len(fid_real) >= 2 else None),
+        "val_LPIPS": round(float(np.mean(lpips_vals)), 4) if lpips_vals else None,
+        "metric_n": metric_seen,
         "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
         "evaluated": datetime.now(timezone.utc).isoformat(),
     }
@@ -134,10 +197,14 @@ def main():
     ap.add_argument("--ngf", type=int, default=64)
     ap.add_argument("--data-root", type=str, default="data/raw/hemit")
     ap.add_argument("--direction", type=str, default=None, choices=["he2dapi", "dapi2he"])
+    ap.add_argument("--metrics", type=str, default="", help="extra metrics, e.g. fid,lpips")
+    ap.add_argument("--metric-num", type=int, default=50, help="images used for FID/LPIPS")
     args = ap.parse_args()
     res = evaluate(args.checkpoint, args.split, args.num, h5_path=args.h5,
                    patch_size=args.patch_size, ngf=args.ngf, data_root=args.data_root,
-                   direction=args.direction)
+                   direction=args.direction,
+                   metrics=[m for m in args.metrics.split(",") if m],
+                   metric_num=args.metric_num)
     if args.label:
         res["label"] = args.label
     if args.target:

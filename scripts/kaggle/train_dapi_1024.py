@@ -5,6 +5,7 @@ Stages (set DAPI_STAGE):
   smoke     - 1 epoch / 20 steps at 512, timing only
   pretrain  - 20 epochs at 512 from the 1024px Macenko HDF5
   finetune  - 2 x 500 steps at 1024 from the 512 checkpoint
+  quality   - longer 1024 fine-tune with colour+gradient losses
   all       - pretrain then finetune in one kernel (no checkpoint dataset needed)
 
 Direction (set DAPI_DIRECTION):
@@ -158,6 +159,25 @@ def train_stage(stage: str, h5: Path) -> None:
             extra = ["--resume", str(ckpt_dir / "checkpoint_last.pt"), "--resume-epoch", "0", "--epochs", "2", "--max-steps", "500"]
         else:
             extra = ["--resume", "auto", "--epochs", "2", "--max-steps", "500"]
+    elif stage == "quality":
+        config = ROOT / f"configs/hemit_{TAG}_quality_1024.yaml"
+        if not config.exists():
+            print(f"FATAL missing quality config {config}")
+            sys.exit(2)
+        incoming = find_input_checkpoint()
+        starting_fresh = not any(ckpt_dir.glob("checkpoint_*.pt"))
+        if starting_fresh:
+            if not incoming:
+                print("FATAL quality stage needs a 1024 checkpoint")
+                sys.exit(2)
+            shutil.copy2(incoming, ckpt_dir / "checkpoint_last.pt")
+            print(f"initialized quality run from {incoming}")
+            # Seed weights but restart the epoch counter so the full quality
+            # schedule (4 epochs at the lower LR) actually runs.
+            extra = ["--resume", str(ckpt_dir / "checkpoint_last.pt"),
+                     "--resume-epoch", "0", "--epochs", "4"]
+        else:
+            extra = ["--resume", "auto", "--epochs", "4"]
     else:
         raise SystemExit(f"unknown stage={stage}")
 
@@ -180,7 +200,7 @@ def train_stage(stage: str, h5: Path) -> None:
 
 
 def main() -> None:
-    if STAGE not in {"smoke", "pretrain", "finetune", "all"}:
+    if STAGE not in {"smoke", "pretrain", "finetune", "quality", "all"}:
         print(f"FATAL unknown DAPI_STAGE={STAGE}")
         sys.exit(2)
 
