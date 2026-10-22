@@ -126,16 +126,32 @@ def _cyclegan_step(G, F, D_he, D_dapi, optimG, optimD, he01, dapi01,
         loss_id = torch.zeros((), device=device)
 
     # --- Discriminators (detach generator outputs) ---
-    loss_D_he = 0.5 * (mse(D_he(he01), torch.ones_like(D_he(he01))) +
-                       mse(D_he(fake_he.detach()), torch.zeros_like(D_he(fake_he.detach()))))
-    loss_D_dapi = 0.5 * (mse(D_dapi(dapi01), torch.ones_like(D_dapi(dapi01))) +
-                         mse(D_dapi(fake_dapi.detach()), torch.zeros_like(D_dapi(fake_dapi.detach()))))
+    real_he = D_he(he01)
+    fake_he_d = D_he(fake_he.detach())
+    real_dapi = D_dapi(dapi01)
+    fake_dapi_d = D_dapi(fake_dapi.detach())
+    loss_D_he = 0.5 * (mse(real_he, torch.ones_like(real_he)) +
+                       mse(fake_he_d, torch.zeros_like(fake_he_d)))
+    loss_D_dapi = 0.5 * (mse(real_dapi, torch.ones_like(real_dapi)) +
+                         mse(fake_dapi_d, torch.zeros_like(fake_dapi_d)))
     loss_D = (loss_D_he + loss_D_dapi) / grad_accum
     loss_D.backward()
 
     # --- Generators ---
-    loss_G_gan = (mse(D_he(fake_he), torch.ones_like(D_he(fake_he))) +
-                  mse(D_dapi(fake_dapi), torch.ones_like(D_dapi(fake_dapi))))
+    # Freeze D parameters so the generator loss only produces gradients for
+    # G/F; otherwise D would be stepped with adversarial-G gradients too.
+    for p in D_he.parameters():
+        p.requires_grad_(False)
+    for p in D_dapi.parameters():
+        p.requires_grad_(False)
+    d_he_fake = D_he(fake_he)
+    d_dapi_fake = D_dapi(fake_dapi)
+    loss_G_gan = (mse(d_he_fake, torch.ones_like(d_he_fake)) +
+                  mse(d_dapi_fake, torch.ones_like(d_dapi_fake)))
+    for p in D_he.parameters():
+        p.requires_grad_(True)
+    for p in D_dapi.parameters():
+        p.requires_grad_(True)
     loss_cycle = l1(rec_dapi, dapi01) + l1(rec_he, he01)
     loss_G = (weights["gan"] * loss_G_gan +
               weights["cycle"] * loss_cycle +
@@ -265,6 +281,9 @@ def train_cyclegan(cfg, args, mon=None):
                         torch.cuda.empty_cache()
                     continue
                 raise RuntimeError(f"step {step}: {exc}") from exc
+        if seen and seen % grad_accum != 0:
+            optimD.step(); optimG.step()
+            optimD.zero_grad(); optimG.zero_grad()
         denom = max(seen, 1)
         print(f"[Epoch {epoch+1}/{epochs}] G {acc['g']/denom:.4f} D {acc['d']/denom:.4f} "
               f"(gan {acc['gan']/denom:.4f} cycle {acc['cycle']/denom:.4f} "
