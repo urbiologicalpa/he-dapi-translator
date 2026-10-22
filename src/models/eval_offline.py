@@ -22,7 +22,7 @@ from skimage.metrics import structural_similarity
 
 def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
              h5_path: str = None, patch_size: int = 512, ngf: int = 64,
-             data_root: str = "data/raw/hemit"):
+             data_root: str = "data/raw/hemit", direction: str = None):
     from src.models.train_paired import UNetGenerator, PatchGANDiscriminator
     from src.models.datasets import PairedHEMITDataset
     from src.models.losses import SSIMLoss, NucleiDiceLoss
@@ -36,11 +36,16 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
     ckpt = torch.load(checkpoint_path, map_location="cpu")
     file_epoch = ckpt.get("epoch", 0) + 1 if isinstance(ckpt, dict) and "epoch" in ckpt else 0
     train_gloss = float(ckpt.get("loss", 0)) if isinstance(ckpt, dict) else 0.0
+    if direction is None:
+        direction = ckpt.get("config", {}).get("data", {}).get("direction", "he2dapi")
+    if direction not in {"he2dapi", "dapi2he"}:
+        raise ValueError(f"unknown direction: {direction}")
+    in_ch, out_ch = (3, 1) if direction == "he2dapi" else (1, 3)
 
-    G = UNetGenerator(ngf=ngf)
+    G = UNetGenerator(in_ch=in_ch, out_ch=out_ch, ngf=ngf)
     G.load_state_dict(ckpt.get("G", ckpt.get("generator", ckpt)))
     G.eval()
-    D = PatchGANDiscriminator()
+    D = PatchGANDiscriminator(in_ch=4)
     if "D" in ckpt:
         D.load_state_dict(ckpt["D"])
     D.eval()
@@ -63,35 +68,43 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
     with torch.no_grad():
         for b in loader:
             he = b["he"]
-            real = b["dapi"]
-            fake = G(he)
-            he01 = (he + 1) / 2
+            dapi = b["dapi"]
+            if direction == "he2dapi":
+                src, src01, real = he, (he + 1) / 2, dapi
+            else:
+                src, src01, real = dapi * 2 - 1, dapi, (he + 1) / 2
+            fake = G(src)
             L1 += l1_fn(fake, real).item()
             mse = mse_fn(fake, real).item()
             SE_PSNR += 10 * math.log10(1 / max(mse, 1e-12))
             SS += ssim_fn(fake, real).item()
-            fake_np = fake[0, 0].detach().cpu().numpy()
-            real_np = real[0, 0].detach().cpu().numpy()
-            SSIM_REAL += structural_similarity(real_np, fake_np, data_range=1.0)
+            fake_np = fake[0].detach().cpu().numpy()
+            real_np = real[0].detach().cpu().numpy()
+            if fake_np.shape[0] == 1:
+                SSIM_REAL += float(structural_similarity(real_np[0], fake_np[0], data_range=1.0))
+            else:
+                SSIM_REAL += float(structural_similarity(real_np, fake_np, data_range=1.0, channel_axis=0))
             corr = float(np.corrcoef(real_np.ravel(), fake_np.ravel())[0, 1])
             if np.isfinite(corr):
                 PEARSON += corr
                 PEARSON_N += 1
-            DICE += (1 - dice_fn(fake, real).item())
-            rp = torch.cat([he01, real], 1)
-            fp = torch.cat([he01, fake], 1)
+            if direction == "he2dapi":
+                DICE += (1 - dice_fn(fake, real).item())
+            rp = torch.cat([src01, real], 1)
+            fp = torch.cat([src01, fake], 1)
             pr = D(rp)
             pf = D(fp)
             DL += ((bce(pr, torch.ones_like(pr)) + bce(pf, torch.zeros_like(pf))) * 0.5).item()
             n += 1
             if n % 10 == 0:
                 gc.collect()
-            del he, real, fake
+            del he, dapi, src, src01, real, fake
     gc.collect()
     return {
         "checkpoint": str(checkpoint_path),
         "file_epoch": file_epoch,
         "split": split,
+        "direction": direction,
         "resolution": patch_size,
         "n": n,
         "train_G_loss": round(train_gloss, 4),
@@ -100,7 +113,7 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
         "val_SSIM": round(SSIM_REAL / n, 4),
         "val_Pearson": round(PEARSON / PEARSON_N, 4) if PEARSON_N else None,
         "val_SSIM_loss_proxy": round(SS / n, 4),
-        "val_Dice_thresh01": round(DICE / n, 4),
+        "val_Dice_thresh01": round(DICE / n, 4) if direction == "he2dapi" else None,
         "val_D_loss": round(DL / n, 4),
         "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
         "evaluated": datetime.now(timezone.utc).isoformat(),
@@ -120,9 +133,11 @@ def main():
     ap.add_argument("--patch-size", type=int, default=512)
     ap.add_argument("--ngf", type=int, default=64)
     ap.add_argument("--data-root", type=str, default="data/raw/hemit")
+    ap.add_argument("--direction", type=str, default=None, choices=["he2dapi", "dapi2he"])
     args = ap.parse_args()
     res = evaluate(args.checkpoint, args.split, args.num, h5_path=args.h5,
-                   patch_size=args.patch_size, ngf=args.ngf, data_root=args.data_root)
+                   patch_size=args.patch_size, ngf=args.ngf, data_root=args.data_root,
+                   direction=args.direction)
     if args.label:
         res["label"] = args.label
     if args.target:

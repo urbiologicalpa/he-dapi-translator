@@ -1,0 +1,20 @@
+{
+  "checkpoint": "/kaggle/input/datasets/bikasash/he-dapi-dapi2he-finetune-ckpt/checkpoint_last.pt",
+  "file_epoch": 2,
+  "split": "val",
+  "direction": "dapi2he",
+  "resolution": 1024,
+  "n": 630,
+  "train_G_loss": 14.8727,
+  "val_L1": 0.1449,
+  "val_PSNR_dB": 15.18,
+  "val_SSIM": 0.4367,
+  "val_Pearson": 0.5214,
+  "val_SSIM_loss_proxy": 0.2484,
+  "val_Dice_thresh01": null,
+  "val_D_loss": 0.7201,
+  "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
+  "evaluated": "2026-10-22T05:03:33.855434+00:00",
+  "label": "dapi2he-1024-unet",
+  "target": "H&E RGB"
+}

@@ -34,6 +34,13 @@ def test_train_paired_dummy():
 
 
 @pytest.mark.slow
+def test_train_paired_reverse_dummy():
+    pytest.importorskip("torch")
+    result = _run_dummy("src.models.train_paired", "configs/hemit_dapi2he_512_pretrain.yaml")
+    assert result.returncode == 0, (result.stdout[-2000:] + result.stderr[-2000:])
+
+
+@pytest.mark.slow
 def test_train_unpaired_dummy():
     pytest.importorskip("torch")
     result = _run_dummy("src.models.train_unpaired", "configs/cyclegan_dapi2he.yaml")

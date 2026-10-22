@@ -1,7 +1,7 @@
 """
-train_paired.py - Paired Pix2Pix training (H&E -> DAPI)
+train_paired.py - Paired Pix2Pix training (H&E -> DAPI or DAPI -> H&E)
 Supports: pix2pix (UNet+PatchGAN) + SSIM + DISTS + nuclei Dice
-Configs: configs/hemit_dual_branch.yaml
+Configs: configs/hemit_dapi_512_pretrain.yaml, configs/hemit_dapi2he_512_pretrain.yaml
 
 Run:
   python src/models/train_paired.py --config configs/hemit_dual_branch.yaml --dummy  (quick smoke test without GPU/data)
@@ -16,11 +16,11 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from .datasets import PairedHEMITDataset
-from .losses import SSIMLoss, DISTSLoss, NucleiDiceLoss
+from .losses import SSIMLoss, DISTSLoss, NucleiDiceLoss, ColorStatsLoss, GradientLoss
 
 # --- Generator / Discriminator (lightweight stubs, replace with real arch) ---
 class UNetGenerator(nn.Module):
-    """Light UNet for demo: 3->1 (HE RGB -> DAPI grayscale). Replace with dual-branch (ResNet+Swin+FMF) for SOTA."""
+    """Light UNet for paired translation: 3->1 (H&E->DAPI) or 1->3 (DAPI->H&E)."""
     def __init__(self, in_ch=3, out_ch=1, ngf=64):
         super().__init__()
         # Encoder
@@ -59,7 +59,22 @@ class PatchGANDiscriminator(nn.Module):
         )
     def forward(self,x): return self.net(x)
 
-def train_one_epoch(G, D, loader, optimG, optimD, device, losses, weights, grad_accum=1, oom_guard=False, monitor=None, max_steps=None):
+def prepare_pair(batch, direction="he2dapi"):
+    """Return (generator_input, discriminator_source, target).
+
+    H&E is [-1,1], DAPI is [0,1]. Both directions condition the PatchGAN on
+    the source image in [0,1] and predict the target in [0,1].
+    """
+    he = batch["he"]
+    dapi = batch["dapi"]
+    if direction == "he2dapi":
+        return he, (he + 1) / 2, dapi
+    if direction == "dapi2he":
+        return dapi * 2 - 1, dapi, (he + 1) / 2
+    raise ValueError(f"unknown direction: {direction}")
+
+
+def train_one_epoch(G, D, loader, optimG, optimD, device, losses, weights, grad_accum=1, oom_guard=False, monitor=None, max_steps=None, direction="he2dapi"):
     G.train(); D.train()
     g_loss_accum = 0
     d_loss_accum = 0
@@ -68,6 +83,8 @@ def train_one_epoch(G, D, loader, optimG, optimD, device, losses, weights, grad_
     l1_accum = 0.0
     ssim_accum = 0.0
     nuclei_accum = 0.0
+    color_accum = 0.0
+    grad_accum_loss = 0.0
     seen = 0
     optimG.zero_grad(); optimD.zero_grad()
     for step, batch in enumerate(loader):
@@ -76,6 +93,7 @@ def train_one_epoch(G, D, loader, optimG, optimD, device, losses, weights, grad_
         try:
             he = batch["he"].to(device)    # Bx3xHxW in [-1,1]
             dapi = batch["dapi"].to(device) # Bx1xHxW in [0,1]
+            src, src01, target = prepare_pair({"he": he, "dapi": dapi}, direction)
         except Exception as e:
             print(f"[OOM] batch to device failed {e}, skipping batch")
             if monitor and not monitor.ensure_headroom(500):
@@ -90,10 +108,9 @@ def train_one_epoch(G, D, loader, optimG, optimD, device, losses, weights, grad_
 
         # Train D
         try:
-            fake_dapi = G(he)  # [0,1]
-            he01 = (he+1)/2
-            real_pair = torch.cat([he01, dapi],1)
-            fake_pair = torch.cat([he01, fake_dapi.detach()],1)
+            fake = G(src)  # [0,1]
+            real_pair = torch.cat([src01, target],1)
+            fake_pair = torch.cat([src01, fake.detach()],1)
             pred_real = D(real_pair)
             pred_fake = D(fake_pair)
             loss_D_real = nn.BCEWithLogitsLoss()(pred_real, torch.ones_like(pred_real))
@@ -116,23 +133,26 @@ def train_one_epoch(G, D, loader, optimG, optimD, device, losses, weights, grad_
 
         # Train G
         try:
-            fake_pair_g = torch.cat([he01, fake_dapi],1)
+            fake_pair_g = torch.cat([src01, fake],1)
             pred_fake_g = D(fake_pair_g)
             loss_G_gan = nn.BCEWithLogitsLoss()(pred_fake_g, torch.ones_like(pred_fake_g))
-            loss_G_l1 = nn.L1Loss()(fake_dapi, dapi)
+            loss_G_l1 = nn.L1Loss()(fake, target)
             # DISTS is heavy on CPU (VGG 400MB) -> skip if dists_on_cpu false or monitor pressure
-            loss_G_ssim = losses["ssim"](fake_dapi, dapi) if "ssim" in losses and losses["ssim"] is not None else 0
+            loss_G_ssim = losses["ssim"](fake, target) if "ssim" in losses and losses["ssim"] is not None else 0
             loss_G_dists = 0
             if "dists" in losses and losses["dists"] is not None:
                 # only compute DISTS if not low RAM
                 if monitor is None or monitor.ensure_headroom(600):
-                    loss_G_dists = losses["dists"](fake_dapi, dapi)
+                    loss_G_dists = losses["dists"](fake, target)
                 else:
                     loss_G_dists = 0
-            loss_G_nuclei = losses["nuclei"](fake_dapi, dapi) if "nuclei" in losses and losses["nuclei"] is not None else 0
+            loss_G_nuclei = losses["nuclei"](fake, target) if "nuclei" in losses and losses["nuclei"] is not None else 0
+            loss_G_color = losses["color"](fake, target) if "color" in losses else 0
+            loss_G_grad = losses["grad"](fake, target) if "grad" in losses else 0
             loss_G = (weights["gan"]*loss_G_gan + weights["l1"]*loss_G_l1 +
                       weights["ssim"]*loss_G_ssim + weights["dists"]*loss_G_dists +
-                      weights["nuclei"]*loss_G_nuclei)
+                      weights["nuclei"]*loss_G_nuclei + weights["color"]*loss_G_color +
+                      weights["grad"]*loss_G_grad)
             loss_G = loss_G / grad_accum
             loss_G.backward()
             if (step+1) % grad_accum == 0:
@@ -157,6 +177,14 @@ def train_one_epoch(G, D, loader, optimG, optimD, device, losses, weights, grad_
                 nuclei_accum += float(loss_G_nuclei.item() if hasattr(loss_G_nuclei, "item") else loss_G_nuclei)
             except Exception:
                 pass
+            try:
+                color_accum += float(loss_G_color.item() if hasattr(loss_G_color, "item") else loss_G_color)
+            except Exception:
+                pass
+            try:
+                grad_accum_loss += float(loss_G_grad.item() if hasattr(loss_G_grad, "item") else loss_G_grad)
+            except Exception:
+                pass
             seen += 1
         except RuntimeError as e:
             if "out of memory" in str(e).lower():
@@ -171,7 +199,7 @@ def train_one_epoch(G, D, loader, optimG, optimD, device, losses, weights, grad_
             monitor.check(f"train:step{step+1}")
             import gc; gc.collect()
         # free per step
-        del he, dapi, fake_dapi, he01
+        del he, dapi, src, src01, target, fake
     # flush remaining grads
     if seen % grad_accum != 0:
         optimG.step(); optimG.zero_grad()
@@ -184,6 +212,8 @@ def train_one_epoch(G, D, loader, optimG, optimD, device, losses, weights, grad_
         "l1": l1_accum / denom,
         "ssim": ssim_accum / denom,
         "nuclei": nuclei_accum / denom,
+        "color": color_accum / denom,
+        "grad": grad_accum_loss / denom,
     }
 
 def main():
@@ -200,6 +230,7 @@ def main():
     ap.add_argument("--checkpoint-dir", type=str, default=None, help="override checkpoint directory")
     ap.add_argument("--epochs", type=int, default=None, help="override number of epochs")
     ap.add_argument("--max-steps", type=int, default=None, help="stop each epoch after N steps (smoke/timing)")
+    ap.add_argument("--direction", type=str, default=None, choices=["he2dapi","dapi2he"], help="translation direction")
     args = ap.parse_args()
 
     # Resource monitor early
@@ -224,6 +255,11 @@ def main():
         data_cfg["processed"] = args.h5
     if args.checkpoint_dir:
         train_cfg["checkpoint_dir"] = args.checkpoint_dir
+    direction = (args.direction or data_cfg.get("direction", "he2dapi")).lower()
+    if direction not in {"he2dapi", "dapi2he"}:
+        raise SystemExit(f"unknown direction: {direction}")
+    cfg.setdefault("data", {})["direction"] = direction
+    print(f"[DIRECTION] {direction}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[DEVICE] {device} (optimize_for={args.optimize_for})")
@@ -275,9 +311,10 @@ def main():
             loader_batch = advised
     loader = DataLoader(ds, batch_size=loader_batch, shuffle=True, num_workers=train_cfg.get("num_workers",0))
 
-    # Models
-    G = UNetGenerator(ngf=model_cfg.get("generator",{}).get("ngf",64)).to(device)
-    D = PatchGANDiscriminator().to(device)
+    # Models: PatchGAN is conditioned on source (1 or 3 ch) + target (1 or 3 ch).
+    in_ch, out_ch = (3, 1) if direction == "he2dapi" else (1, 3)
+    G = UNetGenerator(in_ch=in_ch, out_ch=out_ch, ngf=model_cfg.get("generator",{}).get("ngf",64)).to(device)
+    D = PatchGANDiscriminator(in_ch=4).to(device)
     optimG = torch.optim.Adam(G.parameters(), lr=train_cfg.get("lr",2e-4), betas=(0.5,0.999))
     optimD = torch.optim.Adam(D.parameters(), lr=train_cfg.get("lr",2e-4), betas=(0.5,0.999))
     # Losses - DISTS disabled on CPU if dists_on_cpu false or low RAM to save 400MB VGG
@@ -285,10 +322,14 @@ def main():
     if not use_dists:
         print("[LOWRAM] DISTS disabled on CPU (saves 400MB VGG) -> using L1+SSIM only")
     use_nuclei = loss_cfg.get("nuclei_aux_weight", 2.0) > 0
+    use_color = loss_cfg.get("color_weight", 0.0) > 0
+    use_grad = loss_cfg.get("grad_weight", 0.0) > 0
     losses = {
         "ssim": SSIMLoss(),
         "dists": DISTSLoss() if use_dists else None,
         "nuclei": NucleiDiceLoss() if use_nuclei else None,
+        "color": ColorStatsLoss() if use_color else None,
+        "grad": GradientLoss() if use_grad else None,
     }
     # filter None
     losses = {k:v for k,v in losses.items() if v is not None}
@@ -298,6 +339,8 @@ def main():
         "ssim": loss_cfg.get("ssim_weight",10.0),
         "dists": loss_cfg.get("dists_weight",5.0),
         "nuclei": loss_cfg.get("nuclei_aux_weight",2.0),
+        "color": loss_cfg.get("color_weight",0.0),
+        "grad": loss_cfg.get("grad_weight",0.0),
     }
 
     # --- Resume logic (checkpoint every epoch, resumable) ---
@@ -321,6 +364,9 @@ def main():
     if resume_path and Path(resume_path).exists():
         try:
             ckpt = torch.load(str(resume_path), map_location=device)
+            ckpt_direction = ckpt.get("config", {}).get("data", {}).get("direction", "he2dapi")
+            if ckpt_direction != direction:
+                raise SystemExit(f"checkpoint direction {ckpt_direction} != requested {direction}")
             G.load_state_dict(ckpt.get("G", ckpt.get("generator", ckpt)))
             if "D" in ckpt:
                 D.load_state_dict(ckpt["D"])
@@ -346,11 +392,11 @@ def main():
     print(f"[TRAIN] epochs {epochs} batch {loader_batch} grad_accum {grad_accum} effective {loader_batch*grad_accum} | oom_guard {oom_guard} | device {device}")
     for epoch in range(start_epoch, epochs):
         if mon: mon.check(f"train:epoch{epoch+1}:start")
-        loss = train_one_epoch(G,D,loader,optimG,optimD,device,losses,weights, grad_accum=grad_accum, oom_guard=oom_guard, monitor=mon, max_steps=args.max_steps)
+        loss = train_one_epoch(G,D,loader,optimG,optimD,device,losses,weights, grad_accum=grad_accum, oom_guard=oom_guard, monitor=mon, max_steps=args.max_steps, direction=direction)
         # new dict form (g/d/components) — keep ckpt["loss"] as G for history continuity
         if isinstance(loss, dict):
             g_loss = loss["g"]
-            print(f"[Epoch {epoch+1}/{epochs}] G loss {g_loss:.4f} D loss {loss['d']:.4f} (gan {loss['gan']:.4f} l1 {loss['l1']:.4f} ssim {loss['ssim']:.4f} nuclei {loss['nuclei']:.4f})")
+            print(f"[Epoch {epoch+1}/{epochs}] G loss {g_loss:.4f} D loss {loss['d']:.4f} (gan {loss['gan']:.4f} l1 {loss['l1']:.4f} ssim {loss['ssim']:.4f} nuclei {loss['nuclei']:.4f} color {loss.get('color',0):.4f} grad {loss.get('grad',0):.4f})")
         else:
             g_loss = float(loss)
             print(f"[Epoch {epoch+1}/{epochs}] G loss {g_loss:.4f}")
@@ -383,10 +429,11 @@ def main():
     print(f"[SAVE] Generator -> {ckpt_path}")
 
     if args.export_onnx or train_cfg.get("export_onnx") or args.dummy:
-        dummy = torch.randn(1,3,512,512).to(device)
-        onnx_path = ckpt_dir / "he2dapi_pix2pix.onnx"
+        dummy = torch.randn(1,in_ch,512,512).to(device)
+        in_name, out_name = ("he", "dapi") if direction == "he2dapi" else ("dapi", "he")
+        onnx_path = ckpt_dir / f"{direction}_pix2pix.onnx"
         try:
-            torch.onnx.export(G, dummy, str(onnx_path), input_names=["he"], output_names=["dapi"], dynamic_axes={"he":{0:"batch"},"dapi":{0:"batch"}})
+            torch.onnx.export(G, dummy, str(onnx_path), input_names=[in_name], output_names=[out_name], dynamic_axes={in_name:{0:"batch"},out_name:{0:"batch"}})
             print(f"[ONNX] Exported -> {onnx_path}")
         except Exception as e:
             print(f"[ONNX] Export failed: {e}")

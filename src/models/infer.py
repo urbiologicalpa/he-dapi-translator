@@ -80,10 +80,10 @@ def run_torch_model(tile: np.ndarray, direction: str, checkpoint: str = None, du
             # Return grayscale DAPI, expand to HWC for consistency? Keep HxW
             return out_np
         else:  # dapi2he
-            from src.models.train_unpaired import ResnetGenerator
-            G = ResnetGenerator(in_ch=1, out_ch=3).to(device)
+            G = UNetGenerator(in_ch=1, out_ch=3).to(device)
             if checkpoint and Path(checkpoint).exists():
-                G.load_state_dict(torch.load(checkpoint, map_location=device))
+                ckpt = torch.load(checkpoint, map_location=device)
+                G.load_state_dict(ckpt.get("G", ckpt.get("generator", ckpt)))
             G.eval()
             # DAPI: tile may be RGB HE fake -> need grayscale
             if tile.ndim==3 and tile.shape[2]==3:
@@ -92,6 +92,7 @@ def run_torch_model(tile: np.ndarray, direction: str, checkpoint: str = None, du
             else:
                 dapi_gray = tile if tile.ndim==2 else tile[:,:,0]
             inp = torch.from_numpy(dapi_gray).unsqueeze(0).unsqueeze(0).float().to(device)/255.0
+            inp = inp * 2 - 1
             with torch.no_grad():
                 out = G(inp)  # Bx3xHxW [0,1]
             out_np = (out[0].permute(1,2,0).cpu().numpy()*255).astype(np.uint8)

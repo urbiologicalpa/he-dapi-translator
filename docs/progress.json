@@ -1,7 +1,7 @@
 {
   "project": "he-dapi-translator",
-  "updated": "2026-10-21T15:25:00Z",
-  "status": "alpha; DAPI baseline trained/evaluated (undertrained); reverse paired next",
+  "updated": "2026-10-22T06:03:00Z",
+  "status": "alpha; forward and reverse paired baselines trained/evaluated; both undertrained; quality pass next",
   "overall_percent": 50,
   "machine": {
     "cpu": "Intel i5-10210U 8vCPU 4c/8t",
@@ -55,13 +55,16 @@
       "id": 2,
       "name": "Modeling",
       "status": "IN_PROGRESS",
-      "percent": 50,
+      "percent": 55,
       "artifacts": [
         "src/models/train_paired.py (U-Net baseline)",
         "panCK ablation checkpoint_epoch200.pt (not DAPI)",
         "Kaggle T4 verified",
         "configs/hemit_dapi_512_pretrain.yaml",
-        "configs/hemit_dapi_1024.yaml"
+        "configs/hemit_dapi_1024.yaml",
+        "src/models/train_paired.py (bidirectional --direction)",
+        "configs/hemit_dapi2he_512_pretrain.yaml",
+        "configs/hemit_dapi2he_1024.yaml"
       ],
       "optimization": "batch 2, grad_accum 4, num_workers 0; GPU path next"
     },
@@ -104,8 +107,8 @@
     }
   ],
   "next_actions": [
-    "Implement paired reverse DAPI -> H&E (swap inputs/targets)",
-    "Train/evaluate paired reverse on full 630/945",
+    "Run qualitative reverse audit (DAPI input / real H&E / generated grid)",
+    "Extend 1024 fine-tuning with perceptual/color losses; add FID/LPIPS",
     "Implement full unpaired CycleGAN/CUT and compare",
     "Add direction router for one plugin/API",
     "Improve forward quality (more 1024 steps and/or dual-branch)"
@@ -122,13 +125,21 @@
     {
       "date": "2026-10-21",
       "note": "panCK epoch 200 finished; full 630/945 ablation eval recorded; corrected 1024 H5 built and verified (train 11.5GB, val 2.1GB, test 3.0GB); Kaggle data upload in progress."
+    },
+    {
+      "date": "2026-10-21",
+      "note": "Added bidirectional paired trainer (--direction dapi2he), reverse configs, generic eval, and reverse dummy test. Updated Kaggle code dataset and queued bikasash/he-dapi-dapi2he-1024 (512 pretrain + 1024 fine-tune, stage all)."
+    },
+    {
+      "date": "2026-10-22",
+      "note": "Completed reverse DAPI->H&E 512 pretrain + 1024 fine-tune and full 630/945 eval. Metrics are undertrained (val/test SSIM 0.437/0.593); next is qualitative audit and longer perceptual/color fine-tuning."
     }
   ],
   "kaggle": {
-    "checked_utc": "2026-10-21T15:25:00Z",
+    "checked_utc": "2026-10-22T06:03:00Z",
     "dapi_job": "baseline_complete",
     "reason": "512 pretrain + 1024 fine-tune + full 630/945 eval complete",
-    "gpu_remaining_hours": 25.9,
+    "gpu_remaining_hours": 23.69,
     "quota_refresh": "2026-10-24T00:00:00",
     "old_kernels": [
       "bikasash/he-dapi-product-gpu-train",
@@ -161,6 +172,43 @@
         "pearson": 0.6107,
         "psnr": 26.6,
         "dice": 0.4489
+      }
+    },
+    "reverse_job": {
+      "status": "eval_complete",
+      "kernel": "bikasash/he-dapi-dapi2he-1024",
+      "eval_kernel": "bikasash/he-dapi-dapi2he-1024-eval",
+      "stage": "complete",
+      "direction": "dapi2he",
+      "pretrain": {
+        "epochs": 20,
+        "final_g_loss": 14.8121,
+        "final_d_loss": 0.5576
+      },
+      "finetune": {
+        "epochs": 2,
+        "steps_per_epoch": 500,
+        "final_g_loss": 14.8727,
+        "final_d_loss": 0.5629
+      },
+      "checkpoint_sha256": "dbe6ebdef4d85400085a3740edeea05504d2e01387dbd96c4eb2e1e3e29f634d",
+      "generator_sha256": "c5449c5b780be4efbe192f077a77777c393a85022eaa3e585d2aa2d37266b27b",
+      "note": "training and full 630/945 eval complete; not release quality",
+      "metrics": {
+        "val": {
+          "n": 630,
+          "ssim": 0.4367,
+          "pearson": 0.5214,
+          "psnr": 15.18,
+          "l1": 0.1449
+        },
+        "test": {
+          "n": 945,
+          "ssim": 0.593,
+          "pearson": 0.5764,
+          "psnr": 15.79,
+          "l1": 0.127
+        }
       }
     }
   }

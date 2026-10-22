@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Kaggle T4 runner for corrected H&E -> DAPI (ch0) training.
+"""Kaggle T4 runner for paired H&E <-> DAPI training.
 
 Stages (set DAPI_STAGE):
   smoke     - 1 epoch / 20 steps at 512, timing only
   pretrain  - 20 epochs at 512 from the 1024px Macenko HDF5
   finetune  - 2 x 500 steps at 1024 from the 512 checkpoint
+  all       - pretrain then finetune in one kernel (no checkpoint dataset needed)
+
+Direction (set DAPI_DIRECTION):
+  he2dapi   - default, H&E input -> DAPI ch0 output
+  dapi2he   - reverse, DAPI ch0 input -> H&E output
 
 Attach:
   bikasash/hemit-dapi-1024-ch0-macenko
@@ -20,6 +25,10 @@ import zipfile
 from pathlib import Path
 
 STAGE = os.environ.get("DAPI_STAGE", "smoke").lower()
+DIRECTION = os.environ.get("DAPI_DIRECTION", "he2dapi").lower()
+if DIRECTION not in {"he2dapi", "dapi2he"}:
+    raise SystemExit(f"unknown DAPI_DIRECTION={DIRECTION}")
+TAG = "dapi" if DIRECTION == "he2dapi" else "dapi2he"
 ROOT = Path("/kaggle/working/he-dapi")
 CKPT_ROOT = Path("/kaggle/working/checkpoints")
 INPUT = Path("/kaggle/input")
@@ -116,8 +125,62 @@ def find_input_checkpoint() -> Path | None:
     return max(epochs)[1] if epochs else None
 
 
+def train_stage(stage: str, h5: Path) -> None:
+    ckpt_dir = CKPT_ROOT / f"{TAG}_{stage}"
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+    if stage == "smoke":
+        config = ROOT / f"configs/hemit_{TAG}_512_pretrain.yaml"
+        extra = ["--epochs", "1", "--max-steps", "20", "--batch-size", "2"]
+    elif stage == "pretrain":
+        config = ROOT / f"configs/hemit_{TAG}_512_pretrain.yaml"
+        incoming = find_input_checkpoint()
+        if incoming and not any(ckpt_dir.glob("checkpoint_*.pt")):
+            shutil.copy2(incoming, ckpt_dir / "checkpoint_last.pt")
+            print(f"resume checkpoint {incoming} -> {ckpt_dir}")
+        extra = ["--resume", "auto", "--epochs", "20"]
+    elif stage == "finetune":
+        config = ROOT / f"configs/hemit_{TAG}_1024.yaml"
+        seed = CKPT_ROOT / f"{TAG}_pretrain/checkpoint_last.pt"
+        if not seed.exists():
+            incoming = find_input_checkpoint()
+            if incoming:
+                seed = incoming
+        starting_fresh = not any(ckpt_dir.glob("checkpoint_*.pt"))
+        if starting_fresh:
+            if not seed.exists():
+                print("FATAL fine-tune needs a pretrain checkpoint")
+                sys.exit(2)
+            shutil.copy2(seed, ckpt_dir / "checkpoint_last.pt")
+            print(f"initialized 1024 from {seed}")
+            # Pretrain checkpoint has a high epoch counter; reset it so fine-tune
+            # actually runs epochs 1..2 at the lower 1024 LR.
+            extra = ["--resume", str(ckpt_dir / "checkpoint_last.pt"), "--resume-epoch", "0", "--epochs", "2", "--max-steps", "500"]
+        else:
+            extra = ["--resume", "auto", "--epochs", "2", "--max-steps", "500"]
+    else:
+        raise SystemExit(f"unknown stage={stage}")
+
+    cmd = [
+        sys.executable, "-u", "-m", "src.models.train_paired",
+        "--config", str(config), "--optimize-for", "full",
+        "--h5", str(h5), "--checkpoint-dir", str(ckpt_dir),
+        "--direction", DIRECTION,
+        *extra,
+    ]
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(ROOT)
+    print("STAGE", stage, "DIRECTION", DIRECTION, "CMD", " ".join(cmd), flush=True)
+    result = subprocess.run(cmd, cwd=str(ROOT), env=env)
+    print("exit", result.returncode)
+    for p in sorted(ckpt_dir.glob("*")):
+        print(p.name, f"{p.stat().st_size / 1e6:.1f} MB")
+    if result.returncode:
+        raise SystemExit(result.returncode)
+
+
 def main() -> None:
-    if STAGE not in {"smoke", "pretrain", "finetune"}:
+    if STAGE not in {"smoke", "pretrain", "finetune", "all"}:
         print(f"FATAL unknown DAPI_STAGE={STAGE}")
         sys.exit(2)
 
@@ -135,54 +198,9 @@ def main() -> None:
     if torch.cuda.is_available():
         print(torch.cuda.get_device_name(0))
 
-    ckpt_dir = CKPT_ROOT / ("dapi_smoke" if STAGE == "smoke" else f"dapi_{STAGE}")
-    ckpt_dir.mkdir(parents=True, exist_ok=True)
-
-    if STAGE == "smoke":
-        config = ROOT / "configs/hemit_dapi_512_pretrain.yaml"
-        extra = ["--epochs", "1", "--max-steps", "20", "--batch-size", "2"]
-    elif STAGE == "pretrain":
-        config = ROOT / "configs/hemit_dapi_512_pretrain.yaml"
-        incoming = find_input_checkpoint()
-        if incoming and not any(ckpt_dir.glob("checkpoint_*.pt")):
-            shutil.copy2(incoming, ckpt_dir / "checkpoint_last.pt")
-            print(f"resume checkpoint {incoming} -> {ckpt_dir}")
-        extra = ["--resume", "auto", "--epochs", "20"]
-    else:
-        config = ROOT / "configs/hemit_dapi_1024.yaml"
-        seed = CKPT_ROOT / "dapi_pretrain/checkpoint_last.pt"
-        if not seed.exists():
-            incoming = find_input_checkpoint()
-            if incoming:
-                seed = incoming
-        starting_fresh = not any(ckpt_dir.glob("checkpoint_*.pt"))
-        if starting_fresh:
-            if not seed.exists():
-                print("FATAL fine-tune needs a pretrain checkpoint")
-                sys.exit(2)
-            shutil.copy2(seed, ckpt_dir / "checkpoint_last.pt")
-            print(f"initialized 1024 from {seed}")
-            # Pretrain checkpoint has a high epoch counter; reset it so fine-tune
-            # actually runs epochs 1..2 at the lower 1024 LR.
-            extra = ["--resume", str(ckpt_dir / "checkpoint_last.pt"), "--resume-epoch", "0", "--epochs", "2", "--max-steps", "500"]
-        else:
-            extra = ["--resume", "auto", "--epochs", "2", "--max-steps", "500"]
-
-    cmd = [
-        sys.executable, "-u", "-m", "src.models.train_paired",
-        "--config", str(config), "--optimize-for", "full",
-        "--h5", str(h5), "--checkpoint-dir", str(ckpt_dir),
-        *extra,
-    ]
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(ROOT)
-    print("STAGE", STAGE, "CMD", " ".join(cmd), flush=True)
-    result = subprocess.run(cmd, cwd=str(ROOT), env=env)
-    print("exit", result.returncode)
-    for p in sorted(ckpt_dir.glob("*")):
-        print(p.name, f"{p.stat().st_size / 1e6:.1f} MB")
-    if result.returncode:
-        sys.exit(result.returncode)
+    stages = ["pretrain", "finetune"] if STAGE == "all" else [STAGE]
+    for stage in stages:
+        train_stage(stage, h5)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Kaggle DAPI runbook and status
 
-Last checked: **2026-10-21 15:25 UTC**
+Last checked: **2026-10-22 06:03 UTC**
 
 ## Current status
 
@@ -29,6 +29,27 @@ Last checked: **2026-10-21 15:25 UTC**
   - Metrics saved as `docs/metrics_dapi_1024_{val,test}.json`
 - Test dataset `bikasash/hemit-dapi-1024-ch0-test` was ready and attached.
 - This baseline is undertrained, not release quality.
+- **Reverse paired DAPI → H&E training complete** in
+  `bikasash/he-dapi-dapi2he-1024`:
+  - 512 pretrain: 20/20 epochs, final G `14.8121`, D `0.5576`.
+  - 1024 fine-tune: 2/2 epochs ×500 steps, final G `14.8727`, D `0.5629`.
+  - Checkpoint: `checkpoints/dapi2he_finetune/checkpoint_last.pt`
+    (SHA-256 `dbe6ebdef4d85400085a3740edeea05504d2e01387dbd96c4eb2e1e3e29f634d`).
+  - Generator: `checkpoints/dapi2he_finetune/generator_last.pt`
+    (SHA-256 `c5449c5b780be4efbe192f077a77777c393a85022eaa3e585d2aa2d37266b27b`).
+  - Uploaded as `bikasash/he-dapi-dapi2he-finetune-ckpt`.
+- **Reverse full eval complete** in `bikasash/he-dapi-dapi2he-1024-eval`:
+  - val 630: SSIM `0.4367`, Pearson `0.5214`, PSNR `15.18`, L1 `0.1449`
+  - test 945: SSIM `0.5930`, Pearson `0.5764`, PSNR `15.79`, L1 `0.1270`
+  - Metrics saved as `docs/metrics_dapi2he_1024_{val,test}.json`.
+  - Not release quality; low SSIM/PSNR indicates blur/color mismatch.
+  - Stage `all`: 512 pretrain (20 epochs) then 1024 fine-tune (2×500 steps)
+    in one kernel, so no intermediate checkpoint dataset is required.
+  - Configs: `configs/hemit_dapi2he_512_pretrain.yaml`,
+    `configs/hemit_dapi2he_1024.yaml`.
+  - Code dataset `bikasash/he-dapi-code-dapi-1024` updated with direction
+    support, reverse configs, and generic eval.
+  - Local reverse smoke passed: 2 dummy epochs + ONNX export.
 - Test H5 is **not attached** to the pretrain kernel; attach
   `bikasash/hemit-dapi-1024-ch0-test` for final test eval.
 - GPU quota at launch: **~29.9h**, refresh `2026-10-24T00:00:00`.
@@ -41,6 +62,26 @@ A 100-epoch, native-1024px run is not realistic on a 30h T4 quota. Plan:
 2. **Pretrain** — 20 epochs at 512; ~2.5h at the measured ~7 min/epoch steady state.
 3. **Fine-tune** — 2×500 steps at native 1024 from the 512 checkpoint.
 4. **Evaluate** — full 630 val + 945 test at 1024; save labeled metrics.
+
+## Reverse direction (DAPI → H&E)
+
+The same paired trainer now takes `--direction dapi2he` (or the `data.direction`
+config key). It swaps the generator input/target and builds a 1→3 channel UNet;
+the PatchGAN still receives source + target (1+3 channels).
+
+```bash
+# local smoke
+PYTHONPATH=. .venv/bin/python -m src.models.train_paired \
+  --config configs/hemit_dapi2he_512_pretrain.yaml --dummy
+
+# Kaggle: new kernel bikasash/he-dapi-dapi2he-1024, stage "all"
+# entrypoint defaults to DAPI_DIRECTION=dapi2he and DAPI_STAGE=all
+```
+
+Reverse outputs land in `checkpoints/dapi2he_pretrain/` and
+`checkpoints/dapi2he_finetune/`. Eval writes
+`metrics_dapi2he_1024_{val,test}.json`; Dice is `null` for H&E targets because
+the nuclei-Dice metric is DAPI-only.
 
 Measured throughput is the source of truth. If a later session is materially
 slower, stop and revise the stage targets rather than burn quota silently.

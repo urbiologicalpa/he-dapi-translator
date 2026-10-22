@@ -64,7 +64,7 @@ Protocol notes from the paper/reference implementation:
 | Local CPU, 200 epochs, 512px | panCK (`ch2`) | Ablation, retained | Full 630 val / 945 test: SSIM 0.739 / 0.789, Pearson 0.507 / 0.878, PSNR 29.23 / 30.65 dB; not DAPI |
 | Corrected 1024px U-Net | DAPI (`ch0`) | First baseline, undertrained | Full 630 val / 945 test: SSIM 0.670 / 0.725, Pearson 0.255 / 0.611, PSNR 28.77 / 26.60 dB, Dice 0.104 / 0.449 |
 | Corrected dual-branch | DAPI (`ch0`) | Not implemented | — |
-| Reverse DAPI → H&E | H&E | Not available | — |
+| Reverse DAPI → H&E | H&E | First baseline, undertrained | 20 epochs @512 + 2×500 @1024; full 630/945 eval; not released |
 
 ## First corrected DAPI baseline
 
@@ -76,6 +76,25 @@ Checkpoint: `resources/models/checkpoints/he2dapi_dapi_1024/checkpoint_last.pt`
 |---|---:|---:|---:|---:|---:|
 | val | 630 | 0.670 | 0.255 | 28.77 | 0.104 |
 | test | 945 | 0.725 | 0.611 | 26.60 | 0.449 |
+
+## First reverse DAPI → H&E baseline
+
+Run: Kaggle T4, 20 epochs at 512 then 2×500 steps at 1024, using the same
+paired HEMIT data and budget as forward. Checkpoint:
+`resources/models/checkpoints/dapi2he_1024/checkpoint_last.pt`
+(SHA-256 `dbe6ebde…f634d`). Output is RGB H&E.
+
+| Split | n | SSIM | Pearson | PSNR | L1 |
+|---|---:|---:|---:|---:|---:|
+| val | 630 | 0.437 | 0.521 | 15.18 | 0.1449 |
+| test | 945 | 0.593 | 0.576 | 15.79 | 0.1270 |
+
+This is **not release quality**. The low SSIM/PSNR indicates blur and/or color
+mismatch, and only 1,000 steps were run at 1024. Dice is intentionally `null`
+for RGB H&E; we still need H&E-specific FID/LPIPS or segmentation-based metrics.
+The next pass should inspect qualitative grids, then test longer 1024
+fine-tuning plus perceptual/color losses before comparing against unpaired
+CycleGAN/CUT.
 
 This is **not** paper-level: paper U-Net is SSIM 0.791 / Pearson 0.659.
 The val/test gap is large and likely reflects slide/domain differences plus

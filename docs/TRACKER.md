@@ -23,7 +23,7 @@ used `ch2` as the target. Consequences:
 | Local CPU, 512px | **Complete** | Epoch 200 finished 2026-10-20 19:34 UTC; full 630/945 panCK eval recorded. Do not treat as DAPI. |
 | Kaggle T4 | DAPI baseline complete | 512 pretrain + 1024 fine-tune + full 630/945 eval done. Next: reverse paired. |
 | Corrected 1024px DAPI | Baseline done, undertrained | val/test SSIM 0.670/0.725, Pearson 0.255/0.611. |
-| DAPI → H&E | Not started | Trainer is a smoke-test skeleton; no real weights. |
+| DAPI → H&E | First baseline done | 20/20 @512 + 2×500 @1024; val/test SSIM 0.437/0.593, Pearson 0.521/0.576. Undertrained; quality pass next. |
 
 ## Phases
 
@@ -41,8 +41,8 @@ only completed model is the panCK ablation; DAPI training is still in progress.
 
 ## Next actions
 
-1. Implement paired reverse DAPI → H&E (swap inputs/targets in the paired trainer).
-2. Train and evaluate paired reverse on the same 630/945 splits.
+1. Run a qualitative reverse audit (DAPI input / real H&E / generated grid).
+2. Test longer 1024 fine-tuning plus perceptual/color losses and add FID/LPIPS.
 3. Implement full unpaired CycleGAN/CUT and compare against paired reverse.
 4. Add a direction router for one plugin/API.
 5. Improve forward quality with more 1024 steps and/or dual-branch Swin/FMF.
@@ -78,4 +78,5 @@ Kaggle data/code upload, smoke, pretrain, and fine-tune steps are in
 - 2026-10-20: DAPI channel-order correction; Kaggle T4 availability confirmed;
   README/docs rewritten to match what is actually implemented.
 - 2026-10-21: corrected DAPI 512 pretrain + 1024 fine-tune + full 630/945 eval.
-  Baseline is undertrained; reverse paired is next.
+  Baseline is undertrained. Added bidirectional trainer support and launched
+  paired reverse DAPI → H&E on Kaggle.

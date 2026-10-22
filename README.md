@@ -46,10 +46,10 @@ reproduction.
 
 | Area | State | Notes |
 |---|---|---|
-| Bidirectional plugin / one workflow | **Not available** | UI/API routing scaffold exists; reverse model is untrained, so this is not yet a bidirectional product |
+| Bidirectional plugin / one workflow | **Not available** | Both directions have internal baselines, but there is no direction router or release-quality model yet |
 | H&E → panCK ablation | **Complete / archived** | 200 epochs, full 630/945 evaluation; used only to validate the pipeline |
 | H&E → DAPI | **First baseline trained / internal** | 20 epochs @512 + 1k steps @1024; full 630/945 eval; undertrained, not released |
-| DAPI → H&E | **Not available** | The CycleGAN trainer is a smoke-test skeleton; no real weights |
+| DAPI → H&E | **First baseline trained / internal** | 20 epochs @512 + 2×500 @1024; full 630/945 eval; undertrained, not released |
 | Dual-branch Swin + FMF | **Not implemented** | `train_paired.py` currently builds the U-Net baseline |
 | Data pipeline | **Implemented** | HEMIT 5,292 pairs; corrected 1024px H5 built for train/val/test |
 | Patch inference | **Implemented** | PyTorch + tiled 512px inference on CPU |
@@ -84,10 +84,11 @@ direction, and only then expose both directions as one bidirectional plugin.
   PatchGAN discriminator, L1 + SSIM, optional DISTS, and a nuclei-Dice auxiliary
   loss. A corrected DAPI baseline is trained internally; it is the one-way
   baseline, not the bidirectional product.
-- **Implemented reverse trainer skeleton:** a ResNet generator and a
-  CycleGAN-style dummy loop. It is not a working DAPI → H&E model yet.
+- **Implemented reverse baseline:** the same U-Net with `--direction dapi2he`
+  (1 → 3 channels), trained on the paired HEMIT data. The CycleGAN/CUT trainer
+  remains a skeleton for the unpaired experiment.
 - **Not implemented:** a unified bidirectional model, direction router, shared
-  encoder/dual decoders, or trained reverse weights.
+  encoder/dual decoders, or release-quality reverse weights.
 - **Planned:** the HEMIT dual-branch generator (CNN-ResNet + Swin-T + feature-map
   fusion) and the full paper training protocol. The config name
   `hemit_dual_branch.yaml` is aspirational; the trainer currently selects the
@@ -107,9 +108,9 @@ direction, and only then expose both directions as one bidirectional plugin.
 ### Not implemented or not validated
 
 - A unified bidirectional model or direction router.
-- A trained DAPI → H&E direction.
+- Release-quality DAPI or H&E weights.
 - HEMIT dual-branch / Swin / FMF.
-- Release-quality DAPI weights.
+- H&E-specific perceptual metrics (FID/LPIPS).
 - Clinical or diagnostic validation of any kind.
 
 ## Data
@@ -235,8 +236,12 @@ Current internal baseline:
 - Checkpoint: `resources/models/checkpoints/he2dapi_dapi_1024/checkpoint_last.pt`.
 
 Val/test SSIM is 0.670 / 0.725 and Pearson is 0.255 / 0.611. This is below the
-paper and not release quality. The next step is paired reverse DAPI → H&E, then
-unpaired CycleGAN, then a dual-branch/quality improvement pass.
+paper and not release quality.
+
+The paired reverse baseline is now trained too: val/test SSIM 0.437 / 0.593,
+Pearson 0.521 / 0.576. That is also undertrained and not release quality. Next:
+qualitative audit, longer 1024 fine-tuning with perceptual/color losses, then
+unpaired CycleGAN/CUT and the direction router.
 
 ## Inference
 
@@ -332,7 +337,8 @@ Generated artifacts are git-ignored:
 - [ ] Train corrected U-Net H&E → DAPI baseline on 1024px data.
 - [ ] Run the full 630-image validation and 945-image held-out test evaluation.
 - [ ] Implement/vendor the dual-branch Swin-T + FMF generator.
-- [ ] Train DAPI → H&E (paired if aligned data is available; otherwise unpaired).
+- [x] Train paired DAPI → H&E baseline; full 630/945 eval.
+- [ ] Train/evaluate unpaired CycleGAN/CUT for external H&E generalization.
 - [ ] Add a direction router so one plugin/API accepts either modality.
 - [ ] Benchmark 512px tiled / INT8 CPU inference against the 3.7 GB target.
 - [ ] Ship **bidirectional v1** only after both directions have trained, evaluated
@@ -343,12 +349,11 @@ Generated artifacts are git-ignored:
 
 - **Not for clinical use.** Outputs are synthetic research images and have not
   been reviewed by pathologists or validated for diagnosis.
-- **Not bidirectional yet.** The UI/API scaffold is bidirectional in intent, but
-  only a forward trainer exists; there is no trained reverse model or unified
-  router.
+- **Not bidirectional yet.** Both directions have internal baselines, but there
+  is no direction router and neither model is release quality.
 - **Current weights are panCK, not DAPI.** The channel-order correction
   invalidates the old demo and metrics for DAPI.
-- **No reverse model.** DAPI → H&E is a placeholder, not a trained product.
+- **Reverse model is a baseline only.** DAPI → H&E is trained/evaluated but not release quality.
 - **Architecture gap.** The config and README previously described a
   dual-branch Swin/FMF model that the trainer did not implement. The code now
   documents the U-Net baseline explicitly; the dual-branch is still planned.

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Kaggle GPU eval for corrected H&E -> DAPI (ch0) at native 1024px."""
+"""Kaggle GPU eval for paired H&E <-> DAPI at native 1024px.
+
+Set DAPI_DIRECTION=he2dapi (default) or dapi2he. The direction is also read
+from the checkpoint config, so a matching checkpoint is sufficient.
+"""
 from __future__ import annotations
 
 import json
@@ -13,6 +17,10 @@ from pathlib import Path
 ROOT = Path("/kaggle/working/he-dapi")
 INPUT = Path("/kaggle/input")
 OUT = Path("/kaggle/working")
+DIRECTION = os.environ.get("DAPI_DIRECTION", "he2dapi").lower()
+if DIRECTION not in {"he2dapi", "dapi2he"}:
+    raise SystemExit(f"unknown DAPI_DIRECTION={DIRECTION}")
+TAG = "dapi" if DIRECTION == "he2dapi" else "dapi2he"
 
 
 def run(cmd, cwd=ROOT):
@@ -76,12 +84,14 @@ def main() -> None:
     results = {}
     for split, num in (("val", 630), ("test", 945)):
         h5 = find_one(f"hemit_{split}_1024.h5")
-        out = OUT / f"metrics_dapi_1024_{split}.json"
+        out = OUT / f"metrics_{TAG}_1024_{split}.json"
         cmd = [
             sys.executable, "-u", "-m", "src.models.eval_offline",
             "--checkpoint", str(ckpt), "--h5", str(h5), "--split", split,
             "--num", str(num), "--patch-size", "1024",
-            "--target", "DAPI ch0", "--label", "dapi-1024-unet",
+            "--target", "DAPI ch0" if DIRECTION == "he2dapi" else "H&E RGB",
+            "--label", f"{TAG}-1024-unet",
+            "--direction", DIRECTION,
             "--out", str(out),
         ]
         result = subprocess.run([str(c) for c in cmd], cwd=str(ROOT), env=env)

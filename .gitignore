@@ -34,3 +34,6 @@ wiki/06-training/profile_*.json
 *secret*
 # Private strategy notes (MVP edge — stays local, never pushed)
 private/
+
+# Qualitative audit: keep contact sheet + summary, not every full-res sample
+docs/qualitative_dapi2he/val_*.png

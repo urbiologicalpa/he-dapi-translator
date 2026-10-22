@@ -86,3 +86,24 @@ class NucleiDiceLoss(nn.Module):
         union = pred_mask.sum(dim=(1,2,3)) + true_mask.sum(dim=(1,2,3))
         dice = (2*intersection + self.smooth) / (union + self.smooth)
         return 1 - dice.mean()
+
+
+class ColorStatsLoss(nn.Module):
+    """Match per-channel mean/std so H&E stain colour/contrast is not washed out."""
+
+    def forward(self, pred, target):
+        mean_loss = F.l1_loss(pred.mean(dim=(2, 3)), target.mean(dim=(2, 3)))
+        std_loss = F.l1_loss(pred.std(dim=(2, 3), unbiased=False),
+                             target.std(dim=(2, 3), unbiased=False))
+        return mean_loss + std_loss
+
+
+class GradientLoss(nn.Module):
+    """L1 on horizontal/vertical image gradients; discourages blurred outputs."""
+
+    def forward(self, pred, target):
+        dx = F.l1_loss(pred[:, :, :, 1:] - pred[:, :, :, :-1],
+                       target[:, :, :, 1:] - target[:, :, :, :-1])
+        dy = F.l1_loss(pred[:, :, 1:, :] - pred[:, :, :-1, :],
+                       target[:, :, 1:, :] - target[:, :, :-1, :])
+        return dx + dy
