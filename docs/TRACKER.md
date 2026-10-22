@@ -41,12 +41,15 @@ only completed model is the panCK ablation; DAPI training is still in progress.
 
 ## Next actions
 
-1. Run a qualitative reverse audit (DAPI input / real H&E / generated grid).
-2. Test longer 1024 fine-tuning plus perceptual/color losses and add FID/LPIPS.
-3. Implement full unpaired CycleGAN/CUT and compare against paired reverse.
-4. Add a direction router for one plugin/API.
-5. Improve forward quality with more 1024 steps and/or dual-branch Swin/FMF.
-6. Benchmark tiled/INT8 deployment on the 3.7 GB box.
+1. DONE — qualitative reverse audit (`docs/qualitative_dapi2he/`).
+2. DONE — FID/LPIPS + colour/gradient quality config; reverse quality kernel
+   `bikasash/he-dapi-dapi2he-quality-1024` RUNNING.
+3. IN PROGRESS — CycleGAN implemented (`train_unpaired.py`, `cyclegan_dapi2he.yaml`);
+   kernel `bikasash/he-dapi-cyclegan-dapi2he-1024` queued behind the 2-GPU-session limit.
+4. DONE — auto direction router (`detect_direction`, threshold 0.06) in CLI/streaming/API.
+5. IN PROGRESS — forward quality kernel `bikasash/he-dapi-he2dapi-quality-1024` RUNNING;
+   dual-branch Swin/FMF still open.
+6. DONE — CPU/ONNX/INT8 benchmark; ship ONNX FP32 (`docs/BENCHMARK.md`).
 
 ## Commands
 
