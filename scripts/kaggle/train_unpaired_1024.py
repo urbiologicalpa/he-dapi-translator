@@ -66,7 +66,8 @@ def link_inputs() -> None:
     processed.mkdir(parents=True, exist_ok=True)
     wanted = {
         "hemit_train_1024.h5": "dapi_h5_fallback",
-        "mhist_512.h5": "he_h5_fallback",
+        "mhist_256.h5": "he_h5_fallback",
+        "hemit_val_1024.h5": "val",
     }
     for name in wanted:
         matches = sorted(INPUT.rglob(name))
@@ -100,6 +101,21 @@ def main() -> None:
     print("CMD", " ".join(cmd), flush=True)
     result = subprocess.run(cmd, cwd=str(ROOT), env=env)
     print("exit", result.returncode)
+
+    ckpt = CKPT_DIR / "cyclegan_G_last.pt"
+    if result.returncode == 0 and ckpt.exists():
+        eval_cmd = [
+            sys.executable, "-u", "-m", "src.models.eval_offline",
+            "--checkpoint", str(ckpt), "--direction", "dapi2he",
+            "--h5", str(ROOT / "data/processed/hemit_val_1024.h5"),
+            "--patch-size", "256", "--num", "64",
+            "--label", "cyclegan-dapi2he-1024",
+            "--target", "H&E (MHIST external unpaired)",
+            "--out", str(CKPT_DIR / "eval_cyclegan.json"),
+        ]
+        print("EVAL", " ".join(eval_cmd), flush=True)
+        subprocess.run(eval_cmd, cwd=str(ROOT), env=env)
+
     for p in sorted(CKPT_DIR.glob("*")):
         print(p.name, f"{p.stat().st_size / 1e6:.1f} MB")
     if result.returncode:

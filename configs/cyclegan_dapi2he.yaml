@@ -6,7 +6,7 @@ data:
   patch_size: 256
   stain_norm: none  # was macenko (spike) -> none for CPU
   unpaired: true
-  he_h5_fallback: data/processed/mhist_512.h5
+  he_h5_fallback: data/processed/mhist_256.h5
   dapi_h5_fallback: data/processed/hemit_train_1024.h5
 
 model:
