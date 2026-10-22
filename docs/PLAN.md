@@ -268,7 +268,7 @@ consequences. Add new entries; do not rewrite history.
 | R-003 | 2026-10-21/22 | Kaggle T4 | reverse H&E paired 512→1024 | complete, undertrained | `docs/RESULTS.md` |
 | R-004 | 2026-10-22 | Kaggle T4 | CycleGAN MHIST H&E | complete, negative/confounded | `docs/metrics_dapi2he_cyclegan_256.json` |
 | R-005 | 2026-10-22 14:25 | Kaggle T4 | CycleGAN HEMIT (stale bundle) | **INVALID, cancel** | `LIVE_STATE.md` §4 |
-| R-006 | 2026-10-22 | Kaggle T4 | CycleGAN HEMIT corrected 256 | **staged, launch next** | `/tmp/kaggle_kernel_hemit256/` |
+| R-006 | 2026-10-22 16:42 | Kaggle T4 | CycleGAN HEMIT corrected 256 | **QUEUED (v1)** | `bikasash/he-dapi-cyclegan-hemit-dapi2he-256`; code ds `bikasash/he-dapi-code-hemit-256` |
 
 ---
 

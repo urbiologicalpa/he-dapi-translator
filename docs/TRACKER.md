@@ -21,7 +21,7 @@ splits. Do not present the public weights as DAPI.
 | Reverse paired H&E 1024 | **Complete, undertrained** | val/test SSIM 0.437/0.593, Pearson 0.521/0.576. |
 | CycleGAN MHIST H&E | **Complete, negative/confounded** | FID 362.34 vs paired 342.98; target domain differed. |
 | CycleGAN HEMIT (14:25) | **INVALID — cancel** | Stale code bundle mixed `data/examples`; do not use metrics. |
-| CycleGAN HEMIT corrected 256 | **Staged — launch next** | Code dataset `bikasash/he-dapi-code-hemit-256` READY; kernel `/tmp/kaggle_kernel_hemit256/`. |
+| CycleGAN HEMIT corrected 256 | **QUEUED (v1)** | `bikasash/he-dapi-cyclegan-hemit-dapi2he-256`; code dataset READY; blocked behind the invalid session. |
 
 ## Phases (evidence-gated; see PLAN.md)
 
