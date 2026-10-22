@@ -47,8 +47,9 @@ only completed model is the panCK ablation; DAPI training is still in progress.
 3. IN PROGRESS — CycleGAN implemented (`train_unpaired.py`, `cyclegan_dapi2he.yaml`);
    kernel `bikasash/he-dapi-cyclegan-dapi2he-1024` queued behind the 2-GPU-session limit.
 4. DONE — auto direction router (`detect_direction`, threshold 0.06) in CLI/streaming/API.
-5. IN PROGRESS — forward quality kernel `bikasash/he-dapi-he2dapi-quality-1024` RUNNING;
-   dual-branch Swin/FMF still open.
+5. DONE (negative) — forward quality kernel completed; colour/gradient pass
+   degraded FID/LPIPS vs the baseline (see RESULTS.md). Baseline remains default;
+   val-based selection + dual-branch Swin/FMF still open.
 6. DONE — CPU/ONNX/INT8 benchmark; ship ONNX FP32 (`docs/BENCHMARK.md`).
 
 ## Commands

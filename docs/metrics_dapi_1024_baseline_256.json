@@ -1,0 +1,23 @@
+{
+  "checkpoint": "resources/models/checkpoints/he2dapi_dapi_1024/checkpoint_last.pt",
+  "file_epoch": 2,
+  "split": "val",
+  "direction": "he2dapi",
+  "resolution": 256,
+  "n": 50,
+  "train_G_loss": 3.3349,
+  "val_L1": 0.0198,
+  "val_PSNR_dB": 36.66,
+  "val_SSIM": 0.7438,
+  "val_Pearson": -0.0116,
+  "val_SSIM_loss_proxy": 0.3868,
+  "val_Dice_thresh01": 0.5401,
+  "val_D_loss": 0.8121,
+  "val_FID": 48.52,
+  "val_LPIPS": 0.1145,
+  "metric_n": 50,
+  "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
+  "evaluated": "2026-10-22T10:42:18.303969+00:00",
+  "label": "dapi-1024-baseline-256",
+  "target": "DAPI ch0"
+}

@@ -106,6 +106,27 @@ The reverse FID/LPIPS are far worse than forward, consistent with the low
 output contrast (fake std ≈ 0.09 vs real ≈ 0.18). JSON:
 `docs/metrics_dapi_1024_baseline.json`, `docs/metrics_dapi2he_1024_baseline.json`.
 
+## Forward quality pass (colour + gradient) — negative result
+
+Run: `bikasash/he-dapi-he2dapi-quality-1024`, 4 epochs at 1024 (batch 1,
+grad-accum 8, lr 3e-5) seeded from the forward 1024 baseline, adding
+`color_weight=5`, `grad_weight=2` on top of the existing losses. 50 val crops:
+
+| Checkpoint | px | FID ↓ | LPIPS ↓ | PSNR | SSIM | L1 ↓ |
+|---|---:|---:|---:|---:|---:|---:|
+| Forward 1024 baseline | 256 | **48.52** | **0.1145** | **36.66** | **0.7438** | **0.0198** |
+| Forward quality 4-epoch | 256 | 74.66 | 0.1166 | 35.54 | 0.713 | 0.0234 |
+| Forward 1024 baseline | 512 | 77.14 | 0.1407 | 33.88 | 0.728 | 0.0214 |
+| Forward quality 4-epoch | 512 | 89.32 | 0.1412 | 32.49 | 0.664 | 0.0259 |
+
+The colour/gradient pass did **not** improve DAPI translation and slightly
+degraded every metric. The baseline remains the default forward checkpoint.
+Likely causes: colour-statistic loss overfitting the training slides (the val
+slide differs), no val-based checkpoint selection, and only 4 epochs at a
+constant lr. Next: lower `color_weight`, select on val FID/SSIM, and/or move to
+the dual-branch architecture. JSON: `docs/metrics_dapi_quality_1024_256.json`,
+`docs/metrics_dapi_quality_1024.json`.
+
 This is **not** paper-level: paper U-Net is SSIM 0.791 / Pearson 0.659.
 The val/test gap is large and likely reflects slide/domain differences plus
 limited fine-tuning. It is a plumbing baseline, not a claim of DAPI quality.
