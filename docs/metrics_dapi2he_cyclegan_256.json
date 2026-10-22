@@ -1,0 +1,23 @@
+{
+  "checkpoint": "/home/bikash/kaggle_out_cyclegan/checkpoints/dapi2he_unpaired/cyclegan_G_last.pt",
+  "file_epoch": 0,
+  "split": "val",
+  "direction": "dapi2he",
+  "resolution": 256,
+  "n": 50,
+  "train_G_loss": 0.0,
+  "val_L1": 0.2488,
+  "val_PSNR_dB": 10.76,
+  "val_SSIM": 0.2324,
+  "val_Pearson": -0.0053,
+  "val_SSIM_loss_proxy": 0.0819,
+  "val_Dice_thresh01": null,
+  "val_D_loss": 0.6938,
+  "val_FID": 362.34,
+  "val_LPIPS": 0.6999,
+  "metric_n": 50,
+  "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
+  "evaluated": "2026-10-22T14:22:03.745016+00:00",
+  "label": "cyclegan-dapi2he-256",
+  "target": "H&E (MHIST external unpaired)"
+}

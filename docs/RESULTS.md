@@ -140,6 +140,26 @@ worsened: the pass fit the training slides, not the held-out slide. Keep the
 baseline reverse checkpoint as the comparison point for the CycleGAN run.
 JSON: `docs/metrics_dapi2he_quality_1024.json`.
 
+## Unpaired CycleGAN, external H&E domain (MHIST)
+
+Run: `bikasash/he-dapi-cyclegan-dapi2he-1024`, 10 epochs at 256, batch 4,
+grad-accum 2, ResNet-9 generators + PatchGAN discriminators. The H&E domain was
+MHIST (3,152 patches), the DAPI domain HEMIT train. 50 HEMIT val crops at 256:
+
+| Model | Target domain | FID ↓ | LPIPS ↓ | PSNR | SSIM | L1 ↓ |
+|---|---|---:|---:|---:|---:|---:|
+| Paired reverse baseline | HEMIT H&E | **342.98** | **0.5904** | **13.17** | **0.4941** | **0.2056** |
+| CycleGAN (MHIST H&E) | MHIST H&E | 362.34 | 0.6999 | 10.76 | 0.2324 | 0.2488 |
+
+The unpaired run is worse on every metric, but this comparison is confounded:
+the generator learned MHIST H&E colour/texture while the FID reference is HEMIT
+H&E. Alignment metrics (PSNR/SSIM) are meaningless for an unpaired model.
+JSON: `docs/metrics_dapi2he_cyclegan_256.json`.
+
+A second CycleGAN run with **HEMIT H&E as the unpaired domain** is launched
+(`bikasash/he-dapi-cyclegan-hemit-dapi2he-1024`, `configs/cyclegan_hemit_dapi2he.yaml`)
+so the paired-vs-unpaired comparison uses the same target distribution.
+
 This is **not** paper-level: paper U-Net is SSIM 0.791 / Pearson 0.659.
 The val/test gap is large and likely reflects slide/domain differences plus
 limited fine-tuning. It is a plumbing baseline, not a claim of DAPI quality.

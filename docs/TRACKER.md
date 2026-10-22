@@ -44,8 +44,9 @@ only completed model is the panCK ablation; DAPI training is still in progress.
 1. DONE — qualitative reverse audit (`docs/qualitative_dapi2he/`).
 2. DONE (negative) — FID/LPIPS + colour/gradient quality pass ran; it did not
    improve the reverse model (FID 313→335, SSIM 0.496→0.458). Keep baseline.
-3. IN PROGRESS — CycleGAN implemented (`train_unpaired.py`, `cyclegan_dapi2he.yaml`);
-   kernel `bikasash/he-dapi-cyclegan-dapi2he-1024` queued behind the 2-GPU-session limit.
+3. IN PROGRESS — CycleGAN implemented; MHIST-domain run done but worse than
+   paired reverse (FID 363 vs 343, confounded target domain). HEMIT-domain rerun
+   `bikasash/he-dapi-cyclegan-hemit-dapi2he-1024` RUNNING for a fair comparison.
 4. DONE — auto direction router (`detect_direction`, threshold 0.06) in CLI/streaming/API.
 5. DONE (negative) — forward quality kernel completed; colour/gradient pass
    degraded FID/LPIPS vs the baseline (see RESULTS.md). Baseline remains default;
