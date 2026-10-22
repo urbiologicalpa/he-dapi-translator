@@ -38,6 +38,8 @@
     wrapper); fixed before v3. Live logs are not exposed by the old API.
   - Expected output: `/kaggle/working/checkpoints/hemit_cyclegan_dapi2he_256/`,
     `cyclegan_G_last.pt`, `checkpoint_last.pt`, `eval_cyclegan.json`.
+  - Status monitor: PID `7254`, log `logs/kaggle_256_monitor.log`
+    (`scripts/watch_kaggle_256.sh`, 120s interval, exits on terminal status).
 
 ### Cancelled
 - **Kaggle (invalid):** `bikasash/he-dapi-cyclegan-hemit-dapi2he-1024`
