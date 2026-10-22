@@ -2,7 +2,7 @@
 PY=.venv/bin/python
 MON=$(PY) -m src.utils.resource_monitor --check
 
-.PHONY: health data train-paired-dummy train-unpaired-dummy infer clean wiki
+.PHONY: health data test test-slow train-paired-dummy train-unpaired-dummy infer clean wiki
 
 health:
 	@echo "=== Machine Health ==="
@@ -16,6 +16,12 @@ data:
 	@$(PY) scripts/data/pack_hemit.py 2>&1 | tee /tmp/pack_hemit.log
 	@$(PY) scripts/data/pack_bci.py 2>&1 | tee /tmp/pack_bci.log
 	@echo "[OK] data - check wiki/02-data-extraction/profile.json"
+
+test:
+	@bash scripts/run_tests.sh -q
+
+test-slow:
+	@HE_DAPI_TEST_MEM_MB=3000 bash scripts/run_tests.sh -m slow -q
 
 train-paired-dummy:
 	@$(PY) src/models/train_paired.py --config configs/hemit_dual_branch.yaml --dummy --optimize-for lowram 2>&1 | tee /tmp/train_paired_dummy.log
