@@ -1,0 +1,131 @@
+[
+  {
+    "direction": "he2dapi",
+    "checkpoint": "resources/models/checkpoints/he2dapi_dapi_1024/checkpoint_last.pt",
+    "size": 256,
+    "ngf": 64,
+    "params_m": 6.17,
+    "torch_threads": 4,
+    "cpu": "x86_64",
+    "peak_rss_mb": 688.6,
+    "pytorch_fp32": {
+      "runs": 5,
+      "mean_ms": 176.78,
+      "std_ms": 37.55,
+      "p50_ms": 173.99,
+      "p95_ms": 227.64,
+      "min_ms": 122.23,
+      "max_ms": 237.08
+    },
+    "onnx_fp32": {
+      "runs": 5,
+      "mean_ms": 94.6,
+      "std_ms": 7.05,
+      "p50_ms": 94.92,
+      "p95_ms": 103.47,
+      "min_ms": 83.57,
+      "max_ms": 104.77,
+      "size_mb": 0.0,
+      "max_abs_diff": 0.0,
+      "mean_abs_diff": 0.0
+    },
+    "onnx_int8": {
+      "runs": 5,
+      "mean_ms": 264.85,
+      "std_ms": 11.35,
+      "p50_ms": 269.96,
+      "p95_ms": 273.02,
+      "min_ms": 242.49,
+      "max_ms": 273.6,
+      "size_mb": 16.4,
+      "max_abs_diff": 0.00584,
+      "mean_abs_diff": 0.0
+    }
+  },
+  {
+    "direction": "he2dapi",
+    "checkpoint": "resources/models/checkpoints/he2dapi_dapi_1024/checkpoint_last.pt",
+    "size": 512,
+    "ngf": 64,
+    "params_m": 6.17,
+    "torch_threads": 4,
+    "cpu": "x86_64",
+    "peak_rss_mb": 932.1,
+    "pytorch_fp32": {
+      "runs": 3,
+      "mean_ms": 445.64,
+      "std_ms": 12.72,
+      "p50_ms": 452.41,
+      "p95_ms": 456.25,
+      "min_ms": 427.82,
+      "max_ms": 456.68
+    },
+    "onnx_fp32": {
+      "runs": 3,
+      "mean_ms": 398.91,
+      "std_ms": 31.13,
+      "p50_ms": 379.94,
+      "p95_ms": 436.52,
+      "min_ms": 373.99,
+      "max_ms": 442.81,
+      "size_mb": 24.7,
+      "max_abs_diff": 0.0,
+      "mean_abs_diff": 0.0
+    },
+    "onnx_int8": {
+      "runs": 3,
+      "mean_ms": 852.28,
+      "std_ms": 73.0,
+      "p50_ms": 869.53,
+      "p95_ms": 925.57,
+      "min_ms": 755.49,
+      "max_ms": 931.8,
+      "size_mb": 16.4,
+      "max_abs_diff": 0.00411,
+      "mean_abs_diff": 0.0
+    }
+  },
+  {
+    "direction": "dapi2he",
+    "checkpoint": "resources/models/checkpoints/dapi2he_1024/checkpoint_last.pt",
+    "size": 256,
+    "ngf": 64,
+    "params_m": 6.172,
+    "torch_threads": 4,
+    "cpu": "x86_64",
+    "peak_rss_mb": 673.2,
+    "pytorch_fp32": {
+      "runs": 5,
+      "mean_ms": 107.86,
+      "std_ms": 3.13,
+      "p50_ms": 108.01,
+      "p95_ms": 111.19,
+      "min_ms": 102.83,
+      "max_ms": 111.24
+    },
+    "onnx_fp32": {
+      "runs": 5,
+      "mean_ms": 94.0,
+      "std_ms": 8.56,
+      "p50_ms": 97.9,
+      "p95_ms": 103.63,
+      "min_ms": 80.45,
+      "max_ms": 105.04,
+      "size_mb": 24.7,
+      "max_abs_diff": 1e-05,
+      "mean_abs_diff": 0.0
+    },
+    "onnx_int8": {
+      "runs": 5,
+      "mean_ms": 229.7,
+      "std_ms": 14.85,
+      "p50_ms": 233.4,
+      "p95_ms": 244.57,
+      "min_ms": 202.2,
+      "max_ms": 246.49,
+      "size_mb": 16.4,
+      "max_abs_diff": 0.17273,
+      "mean_abs_diff": 0.00509
+    }
+  }
+]

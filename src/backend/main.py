@@ -49,8 +49,8 @@ async def translate(file: UploadFile = File(...), direction: str = "he2dapi"):
     except HTTPException:
         raise
     except: pass
-    if direction not in ("he2dapi","dapi2he"):
-        raise HTTPException(400, "direction must be he2dapi or dapi2he")
+    if direction not in ("he2dapi","dapi2he","auto"):
+        raise HTTPException(400, "direction must be he2dapi, dapi2he, or auto")
     data = await file.read()
     # Guard: limit upload to 500MB after read
     if len(data) > 500*1024*1024:
@@ -73,6 +73,11 @@ async def translate(file: UploadFile = File(...), direction: str = "he2dapi"):
     except Exception as e:
         raise HTTPException(400, f"Invalid image: {e}")
     tile = np.array(img)
+    try:
+        from src.models.infer import resolve_direction
+        direction = resolve_direction(direction, tile)
+    except Exception as exc:
+        raise HTTPException(400, f"direction routing failed: {exc}")
     # Handle WSI-sized upload via tiling if >1024
     if max(tile.shape[:2]) > 1024:
         from src.utils.tiling import TiledInference

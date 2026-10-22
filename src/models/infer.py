@@ -57,6 +57,34 @@ def save_image(arr: np.ndarray, path: str):
         Image.fromarray(arr).save(path)
     print(f"[SAVE] {path} shape {arr.shape}")
 
+def detect_direction(image: np.ndarray, threshold: float = 0.06) -> str:
+    """Route an image to he2dapi or dapi2he from its colour content.
+
+    DAPI is (near) grayscale, so the mean channel chroma is ~0. H&E is stained
+    and lands well above the threshold (~0.2-0.35 on HEMIT/MHIST examples).
+    """
+    arr = np.asarray(image)
+    if arr.ndim == 2 or (arr.ndim == 3 and arr.shape[2] == 1):
+        return "dapi2he"
+    rgb = arr[..., :3].astype(np.float32)
+    mx = rgb.max(axis=2)
+    mn = rgb.min(axis=2)
+    chroma = float(np.mean((mx - mn) / np.maximum(mx, 1e-6)))
+    return "he2dapi" if chroma >= threshold else "dapi2he"
+
+
+def resolve_direction(direction: str, image: np.ndarray) -> str:
+    """Resolve 'auto' against an image; pass explicit directions through."""
+    direction = (direction or "auto").lower()
+    if direction == "auto":
+        chosen = detect_direction(image)
+        print(f"[ROUTER] auto -> {chosen}")
+        return chosen
+    if direction not in {"he2dapi", "dapi2he"}:
+        raise ValueError(f"unknown direction: {direction}")
+    return direction
+
+
 def run_torch_model(tile: np.ndarray, direction: str, checkpoint: str = None, dummy: bool = False) -> np.ndarray:
     """Run PyTorch generator on single tile (HWC uint8) -> synthetic HWC uint8. Falls back to dummy invert."""
     if dummy:
@@ -80,10 +108,17 @@ def run_torch_model(tile: np.ndarray, direction: str, checkpoint: str = None, du
             # Return grayscale DAPI, expand to HWC for consistency? Keep HxW
             return out_np
         else:  # dapi2he
-            G = UNetGenerator(in_ch=1, out_ch=3).to(device)
+            state = None
             if checkpoint and Path(checkpoint).exists():
                 ckpt = torch.load(checkpoint, map_location=device)
-                G.load_state_dict(ckpt.get("G", ckpt.get("generator", ckpt)))
+                state = ckpt.get("G", ckpt.get("generator", ckpt))
+            if state is not None and any(k.startswith("net.") for k in state):
+                from src.models.train_unpaired import ResnetGenerator
+                G = ResnetGenerator(in_ch=1, out_ch=3).to(device)
+            else:
+                G = UNetGenerator(in_ch=1, out_ch=3).to(device)
+            if state is not None:
+                G.load_state_dict(state)
             G.eval()
             # DAPI: tile may be RGB HE fake -> need grayscale
             if tile.ndim==3 and tile.shape[2]==3:
@@ -159,6 +194,7 @@ def infer_patch(input_path: str, direction: str, out_path: str, onnx_path: str =
         mon.check(f"infer:{direction}:start")
     except: mon=None
     img = load_image(input_path, max_size=2048 if not stream else 4096, stream=stream)
+    direction = resolve_direction(direction, img)
     print(f"[PATCH] Input {input_path} shape {img.shape}, direction {direction} (stream={stream})")
     # If image larger than tile_size, use tiled inference (streaming aware)
     h,w = img.shape[:2]
@@ -233,6 +269,8 @@ def infer_wsi_streaming(wsi_path: str, direction: str, out_path: str, checkpoint
     mon.check(f"wsi_stream:{direction}:start")
     loader = WSILoader(wsi_path)
     w,h = loader.level_dimensions[0]
+    if (direction or "").lower() == "auto":
+        direction = resolve_direction("auto", loader.get_thumbnail(max_size=1024))
     print(f"[WSI STREAM] {wsi_path} {w}x{h} backend {loader._backend} -> {out_path}")
     tiler = TiledInference(tile_size=tile_size, stride=stride)
     # Determine output channels
@@ -302,7 +340,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", type=str, default=None)
     ap.add_argument("--dummy", action="store_true", help="run a lightweight inference smoke test")
-    ap.add_argument("--direction", type=str, default="he2dapi", choices=["he2dapi","dapi2he"])
+    ap.add_argument("--direction", type=str, default="he2dapi", choices=["he2dapi","dapi2he","auto"])
     ap.add_argument("--out", type=str, default=None)
     ap.add_argument("--onnx", type=str, default=None)
     ap.add_argument("--checkpoint", type=str, default=None)

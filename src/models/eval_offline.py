@@ -77,8 +77,14 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
         raise ValueError(f"unknown direction: {direction}")
     in_ch, out_ch = (3, 1) if direction == "he2dapi" else (1, 3)
 
-    G = UNetGenerator(in_ch=in_ch, out_ch=out_ch, ngf=ngf)
-    G.load_state_dict(ckpt.get("G", ckpt.get("generator", ckpt)))
+    state = ckpt.get("G", ckpt.get("generator", ckpt))
+    if any(str(k).startswith("net.") for k in state):
+        from src.models.train_unpaired import ResnetGenerator
+        n_blocks = ckpt.get("config", {}).get("model", {}).get("generator", {}).get("n_blocks", 9)
+        G = ResnetGenerator(in_ch=in_ch, out_ch=out_ch, ngf=ngf, n_blocks=n_blocks)
+    else:
+        G = UNetGenerator(in_ch=in_ch, out_ch=out_ch, ngf=ngf)
+    G.load_state_dict(state)
     G.eval()
     D = PatchGANDiscriminator(in_ch=4)
     if "D" in ckpt:

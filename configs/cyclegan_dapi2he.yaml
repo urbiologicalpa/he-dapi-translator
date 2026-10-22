@@ -7,7 +7,7 @@ data:
   stain_norm: none  # was macenko (spike) -> none for CPU
   unpaired: true
   he_h5_fallback: data/processed/mhist_512.h5
-  dapi_h5_fallback: data/processed/hemit_train_512.h5
+  dapi_h5_fallback: data/processed/hemit_train_1024.h5
 
 model:
   name: cyclegan
@@ -21,16 +21,17 @@ model:
   loss:
     gan_weight: 1.0
     cycle_weight: 10.0
-    identity_weight: 5.0
+    identity_weight: 0.0  # DAPI(1ch)->H&E(3ch): identity mapping is undefined
     # CUT variant:
     nce_weight: 2.0
     sacsi_weight: 1.0  # cellular intensity consistency
 
 training:
-  epochs: 200
-  batch_size: 2  # was 4 -> 2 for 3.7GB (CycleGAN has 2G+2D = 4 nets ~ 2× RAM of pix2pix)
+  epochs: 10  # first unpaired baseline; increase after a qualitative check
+  batch_size: 2  # low-RAM default; the Kaggle runner overrides to 4
   grad_accum: 4
-  num_workers: 0  # was implicit 8 -> 0
+  num_workers: 0  # 0 on the CPU box; the Kaggle runner overrides to 2
+  log_every: 100
   lr: 0.0002
   mixed_precision: false
   dists_on_cpu: false

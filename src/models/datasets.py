@@ -215,7 +215,8 @@ class UnpairedDataset(Dataset):
     Returns: dict {he: Tensor, dapi: Tensor} randomly sampled from each domain.
     For CUT/CycleGAN: X = DAPI, Y = HE
     """
-    def __init__(self, he_root: str, dapi_root: str, patch_size: int = 256, augment: bool = True, cache_size: int = 32):
+    def __init__(self, he_root: str, dapi_root: str, patch_size: int = 256, augment: bool = True,
+                 cache_size: int = 32, he_h5: str | None = None, dapi_h5: str | None = None):
         self.he_root = Path(he_root) if he_root else Path("data/raw/mhist")
         self.dapi_root = Path(dapi_root) if dapi_root else Path("data/raw/hemit/dapi")
         self.patch_size = patch_size
@@ -226,7 +227,10 @@ class UnpairedDataset(Dataset):
         self.dapi_files = list(self.dapi_root.rglob("*.png")) + list(self.dapi_root.rglob("*.jpg")) + list(self.dapi_root.rglob("*.tif*")) if self.dapi_root.exists() else []
         # if dapi_root is HDF5 (hemit), fallback to H5 sampling: use file list empty -> sample from H5
         self._dapi_h5 = None
-        if not self.dapi_files:
+        if dapi_h5 and Path(dapi_h5).exists():
+            self._dapi_h5 = str(dapi_h5)
+            print(f"[Unpaired] DAPI source HDF5 {dapi_h5}")
+        elif not self.dapi_files:
             # try HDF5 DAPI source (hemit_*.h5)
             for cand in [Path("data/processed/hemit_train_512.h5"), Path("data/processed/maxpmx_train_512.h5")]:
                 if cand.exists():
@@ -243,17 +247,32 @@ class UnpairedDataset(Dataset):
             self.dapi_files = [None]*8
         # also support H5 for HE (mhist_*.h5) if no pngs
         self._he_h5 = None
-        if len(self.he_files) < 10:
+        if he_h5 and Path(he_h5).exists():
+            self._he_h5 = str(he_h5)
+            print(f"[Unpaired] HE source HDF5 {he_h5}")
+        elif len(self.he_files) < 10:
             for cand in [Path("data/processed/mhist_512.h5"), Path("data/processed/mhist_256.h5")]:
                 if cand.exists():
                     self._he_h5 = str(cand)
                     print(f"[Unpaired] HE fallback to HDF5 {cand}")
                     break
+        self._he_n = self._h5_length(self._he_h5, "he")
+        self._dapi_n = self._h5_length(self._dapi_h5, "dapi")
         print(f"[Unpaired] HE: {len(self.he_files)} files {(' + H5 '+self._he_h5) if self._he_h5 else ''}, DAPI: {len(self.dapi_files)} files {(' + H5 '+self._dapi_h5) if self._dapi_h5 else ''} (low-RAM: no preload)")
         self._he_h5_handle = None
         self._dapi_h5_handle = None
 
-    def __len__(self): return max(len(self.he_files), len(self.dapi_files))
+    @staticmethod
+    def _h5_length(path, key):
+        if not path or h5py is None:
+            return 0
+        try:
+            with h5py.File(path, "r") as f:
+                return int(f[key].shape[0]) if key in f else int(f["he"].shape[0])
+        except Exception:
+            return 0
+
+    def __len__(self): return max(len(self.he_files), len(self.dapi_files), self._he_n, self._dapi_n)
 
     def _get_he_h5(self):
         if self._he_h5 and self._he_h5_handle is None and h5py:
@@ -274,7 +293,7 @@ class UnpairedDataset(Dataset):
         rng_idx_he = idx % len(self.he_files) if self.he_files else 0
         # Load HE - prefer H5 if available and random use it periodically to avoid PNG decompress spike
         he = None
-        if self._he_h5 and np.random.rand() < 0.5:  # 50% from H5 to reduce PNG I/O spikes
+        if self._he_h5 and (not self.he_files or np.random.rand() < 0.5):  # H5 is the only source when no PNGs
             h5f = self._get_he_h5()
             if h5f is not None:
                 ri = np.random.randint(0, h5f["he"].shape[0])
@@ -291,7 +310,7 @@ class UnpairedDataset(Dataset):
                 he = np.random.randint(0,255,(self.patch_size,self.patch_size,3),dtype=np.uint8)
         # Load DAPI - similarly H5 path
         dapi = None
-        if self._dapi_h5:
+        if self._dapi_h5 and (not self.dapi_files or np.random.rand() < 0.5):
             h5f = self._get_dapi_h5()
             if h5f is not None:
                 ri = np.random.randint(0, h5f["dapi"].shape[0] if "dapi" in h5f else h5f["he"].shape[0])
