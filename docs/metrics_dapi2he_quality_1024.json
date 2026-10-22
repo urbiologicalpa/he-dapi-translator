@@ -1,0 +1,23 @@
+{
+  "checkpoint": "/home/bikash/kaggle_out_quality_reverse/checkpoints/dapi2he_quality/checkpoint_last.pt",
+  "file_epoch": 4,
+  "split": "val",
+  "direction": "dapi2he",
+  "resolution": 512,
+  "n": 50,
+  "train_G_loss": 11.0167,
+  "val_L1": 0.2053,
+  "val_PSNR_dB": 12.95,
+  "val_SSIM": 0.4578,
+  "val_Pearson": 0.3889,
+  "val_SSIM_loss_proxy": 0.0607,
+  "val_Dice_thresh01": null,
+  "val_D_loss": 1.2113,
+  "val_FID": 334.85,
+  "val_LPIPS": 0.5988,
+  "metric_n": 50,
+  "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
+  "evaluated": "2026-10-22T12:12:36.957899+00:00",
+  "label": "dapi2he-quality-1024",
+  "target": "H&E"
+}

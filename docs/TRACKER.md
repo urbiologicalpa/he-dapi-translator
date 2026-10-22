@@ -42,8 +42,8 @@ only completed model is the panCK ablation; DAPI training is still in progress.
 ## Next actions
 
 1. DONE — qualitative reverse audit (`docs/qualitative_dapi2he/`).
-2. DONE — FID/LPIPS + colour/gradient quality config; reverse quality kernel
-   `bikasash/he-dapi-dapi2he-quality-1024` RUNNING.
+2. DONE (negative) — FID/LPIPS + colour/gradient quality pass ran; it did not
+   improve the reverse model (FID 313→335, SSIM 0.496→0.458). Keep baseline.
 3. IN PROGRESS — CycleGAN implemented (`train_unpaired.py`, `cyclegan_dapi2he.yaml`);
    kernel `bikasash/he-dapi-cyclegan-dapi2he-1024` queued behind the 2-GPU-session limit.
 4. DONE — auto direction router (`detect_direction`, threshold 0.06) in CLI/streaming/API.

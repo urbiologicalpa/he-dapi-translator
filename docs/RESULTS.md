@@ -127,6 +127,19 @@ constant lr. Next: lower `color_weight`, select on val FID/SSIM, and/or move to
 the dual-branch architecture. JSON: `docs/metrics_dapi_quality_1024_256.json`,
 `docs/metrics_dapi_quality_1024.json`.
 
+The reverse quality pass is also a negative result (same 4-epoch recipe, 50 val
+crops at 512px):
+
+| Checkpoint | FID ↓ | LPIPS ↓ | PSNR | SSIM | L1 ↓ |
+|---|---:|---:|---:|---:|---:|
+| Reverse 1024 baseline | **313.18** | 0.6051 | **13.25** | **0.496** | **0.2009** |
+| Reverse quality 4-epoch | 334.85 | **0.5988** | 12.95 | 0.458 | 0.2053 |
+
+Train losses fell monotonically (G 11.59 → 11.02) while val FID/PSNR/SSIM
+worsened: the pass fit the training slides, not the held-out slide. Keep the
+baseline reverse checkpoint as the comparison point for the CycleGAN run.
+JSON: `docs/metrics_dapi2he_quality_1024.json`.
+
 This is **not** paper-level: paper U-Net is SSIM 0.791 / Pearson 0.659.
 The val/test gap is large and likely reflects slide/domain differences plus
 limited fine-tuning. It is a plumbing baseline, not a claim of DAPI quality.
