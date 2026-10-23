@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from src.models import datasets as datasets_mod
 from src.models.datasets import PairedHEMITDataset
 
 
@@ -84,8 +85,14 @@ def test_unpaired_h5_only_domains_use_h5_not_synthetic_noise(tmp_path, monkeypat
     sample = ds[0]
     assert float(sample["he"].std()) == pytest.approx(0.0, abs=1e-6)
     assert float(sample["dapi"].std()) == pytest.approx(0.0, abs=1e-6)
-    assert float(sample["he"].mean()) == pytest.approx(127 / 127.5 - 1.0, abs=1e-6)
-    assert float(sample["dapi"].mean()) == pytest.approx(63 / 255.0, abs=1e-6)
+    if datasets_mod.torch is None:
+        # CI resource-guards job installs numpy/h5py without torch. The loader
+        # returns uint8 arrays in that mode; normalisation is torch-only.
+        assert float(sample["he"].mean()) == pytest.approx(127.0, abs=1e-6)
+        assert float(sample["dapi"].mean()) == pytest.approx(63.0, abs=1e-6)
+    else:
+        assert float(sample["he"].mean()) == pytest.approx(127 / 127.5 - 1.0, abs=1e-6)
+        assert float(sample["dapi"].mean()) == pytest.approx(63 / 255.0, abs=1e-6)
 
 
 def test_explicit_h5_is_authoritative_over_examples(tmp_path):
