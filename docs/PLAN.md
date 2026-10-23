@@ -1,5 +1,14 @@
 # PLAN v2.0 — canonical product + research plan
 
+> **BLOCKER 2026-10-23 — channel audit reverses ADR-001.**
+> The raw HEMIT RGB TIFF has **ch2=DAPI (blue), ch0=panCK (red), ch1=CD3
+> (green)**. The legacy 512 model is the real DAPI model; the 1024 `ch0`
+> forward/reverse models and R-006 are panCK. All DAPI runs/claims are frozen.
+> **ADR-014 is accepted**; see [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md). The 256
+> H5 rebuild is complete and verified; the loader reads `mihc[...,2]`. Do not
+> launch a 1024 DAPI run from a `ch0` cache; a corrected `ch2` baseline is
+> still pending.
+
 **Status:** authoritative as of **2026-10-22 16:40 UTC**. Supersedes
 `docs/WORKPLAN.md` v1.1 (kept only as history).
 **Owner:** user (`urbiologicalpa`) + coding agent.
@@ -51,11 +60,11 @@ API/plugin/UI), not another one-way paper reproduction.
 The old 12-week Gantt is replaced by **evidence-gated stages**. A stage is not
 "done" because code exists; it is done when its gate artifact exists.
 
-| Stage | Gate artifact | Current state (2026-10-22) |
+| Stage | Gate artifact | Current state (2026-10-23) |
 |---|---|---|
 | 0. Truth & infra | CI green, Docker build, resource guards, channel regression tests | **DONE** |
-| 1. Data contract | Corrected 1024 H5 for train/val/test, channel proof, no leakage, checksums | **DONE** |
-| 2. Model baselines | Forward + reverse paired baselines; fair unpaired comparison; selection memo | **IN PROGRESS** |
+| 1. Data contract | `ch2=DAPI` proof, loader precedence, 256 H5 rebuilt/verified, no leakage, checksums | **DONE (re-closed 2026-10-23)** |
+| 2. Model baselines | Valid `ch2` forward + reverse paired baselines; fair unpaired comparison; selection memo | **IN PROGRESS**; legacy 512 DAPI verified, 1024 `ch0` is panCK, corrected `ch2` both-direction run active |
 | 3. Validation | Full-split metrics, CIs, qualitative/blinded audit, failure analysis, limitations | **PARTIAL** |
 | 4. Product integration | Router + API/UI + WSI + ONNX + model manifest, same checkpoint everywhere | **ALPHA** |
 | 5. Release | Staging UAT, manual prod approval, model card, rollback | **ALPHA** |
@@ -65,9 +74,9 @@ The old 12-week Gantt is replaced by **evidence-gated stages**. A stage is not
 
 | Sub-stage | Hypothesis / purpose | Gate |
 |---|---|---|
-| 2.1 Forward paired baseline | U-Net can learn H&E→DAPI ch0 | **DONE, undertrained**; val SSIM 0.670, Pearson 0.255 |
-| 2.2 Reverse paired baseline | U-Net can learn DAPI→H&E | **DONE, undertrained**; val SSIM 0.437, PSNR 15.18 |
-| 2.3 Fair unpaired comparison | CycleGAN on **HEMIT** H&E (same target domain, same 256px eval) is competitive with paired reverse | **RUN NOW** (corrected 256 kernel) |
+| 2.1 Forward paired baseline | U-Net can learn H&E→DAPI (`ch2`) | Legacy 512 `ch2` verified (50-crop FID 146.27, SSIM 0.7662); corrected 1024 `ch2` running. **1024 `ch0` run is panCK, invalid.** |
+| 2.2 Reverse paired baseline | U-Net can learn DAPI→H&E | **No valid run.** The 1024 `ch0` reverse is panCK→H&E. Corrected `ch2` running. |
+| 2.3 Fair unpaired comparison | CycleGAN on **HEMIT** H&E (same target domain, same 256px eval) is competitive with paired reverse | **BLOCKED**; R-006 is `ch0` panCK. Re-run on rebuilt `ch2` 256 only after 2.1/2.2. |
 | 2.4 Reverse model selection | Pick paired vs unpaired using **val** FID/LPIPS + blinded qualitative audit + cost; test only once | Not started |
 | 2.5 Quality pass | Longer 1024 schedule, val-based checkpoint selection, perceptual/color losses, dual-branch forward | Not started |
 
@@ -105,34 +114,42 @@ wasted GPU quota.
 
 ### 3.1 Data
 - HEMIT: 5,292 aligned pairs, splits 3,717 / 630 / 945.
-- Labels: **ch0=DAPI, ch1=CD3, ch2=panCK**. The old 512 H5 used ch2 → the
-  epoch-199/200 model, public HF weights, demo, and `metrics_eval.json` are a
-  **panCK ablation**.
-- Corrected 1024 H5: train 11.5GB, val 2.1GB, test 3.0GB.
+- **Channel audit (2026-10-23): the raw RGB TIFF is `ch2=DAPI` (blue),
+  `ch0=panCK` (red), `ch1=CD3` (green). ADR-001 is reversed by proposed
+  ADR-014. The old 512 H5 used ch2, so the legacy model/public weights are the
+  real **H&E→DAPI** baseline; the 1024 `ch0` models are the panCK ablation.**
+  All DAPI claims are frozen until the H5 is rebuilt on ch2.
+- "Corrected" 1024 H5 (currently `ch0`/panCK): train 11.5GB, val 2.1GB, test
+  3.0GB. Must be rebuilt with `dapi=mihc[...,2]` before any DAPI run.
 - Derived 256 H5 (center crop, LZF): train 596MB, val 104MB, test 148MB.
 - H5 is authoritative. `UnpairedDataset` must show
   `HE: 0 files + H5 …` and `synthetic=False`; any example fallback is a bug.
 
 ### 3.2 Measured baselines (full val/test unless noted)
+**Frozen numbers below are `ch0`=panCK, not DAPI. Do not cite them as DAPI.**
+
 | Run | Target | Val SSIM | Val Pearson | Val PSNR | Test SSIM | Test Pearson | Test PSNR |
 |---|---|---:|---:|---:|---:|---:|---:|
-| Forward paired 1024 | DAPI ch0 | 0.670 | 0.255 | 28.77 | 0.725 | 0.611 | 26.60 |
-| Reverse paired 1024 | H&E | 0.437 | 0.521 | 15.18 | 0.593 | 0.576 | 15.79 |
-| MHIST CycleGAN 256 | MHIST H&E | 0.232 | — | 10.76 | — | — | — |
+| Forward paired 1024 | panCK `ch0` (invalid for DAPI) | 0.670 | 0.255 | 28.77 | 0.725 | 0.611 | 26.60 |
+| Reverse paired 1024 | H&E from panCK `ch0` (invalid for DAPI) | 0.437 | 0.521 | 15.18 | 0.593 | 0.576 | 15.79 |
+| MHIST CycleGAN 256 | MHIST H&E (DAPI side `ch0`=panCK; confounded) | 0.232 | — | 10.76 | — | — | — |
 
 FID/LPIPS at 256 (50 val crops unless stated):
-- Paired reverse: FID 342.98, LPIPS 0.5904.
+- Paired reverse (`ch0` panCK): FID 342.98, LPIPS 0.5904.
 - MHIST CycleGAN: FID 362.34, LPIPS 0.6999 — **confounded target domain**, not
   a fair unpaired verdict.
-- Forward baseline at 256: FID 48.52, LPIPS 0.1145.
+- Forward baseline at 256 (`ch0` panCK): FID 48.52, LPIPS 0.1145.
+- R-006 HEMIT CycleGAN 256 (`ch0` panCK): FID 367.97, LPIPS 0.5948. Invalid
+  for DAPI.
 
 ### 3.3 Product surface
 - FastAPI `/health`, `/models`, `/translate`, `/translate/wsi`; React UI;
   Docker staging; PyPI `he-dapi` + `napari-he-dapi`; HF demo.
 - Direction router `detect_direction` (threshold 0.06) exists.
 - ONNX FP32 CPU benchmark recorded (`docs/BENCHMARK.md`).
-- **Caveat:** currently published weights/demo are the panCK ablation; must not
-  be presented as DAPI. Corrected weights are internal and undertrained.
+- **Caveat (2026-10-23 audit):** the legacy 512 public weights/demo are the
+  real H&E→DAPI model (`ch2`); the 1024 `ch0` models are panCK and must not be
+  presented as DAPI.
 
 ### 3.4 Compute
 - Local: 3.7GB RAM, 1GB swap, CPU only. Full 4-network training is unsafe.
@@ -149,12 +166,16 @@ FID/LPIPS at 256 (50 val crops unless stated):
 Every material decision gets an ID, date, context, decision, why, and
 consequences. Add new entries; do not rewrite history.
 
-### ADR-001 — HEMIT channels: ch0=DAPI, ch2=panCK (2026-10-20)
+### ADR-001 — HEMIT channels: ch0=DAPI, ch2=panCK (2026-10-20) — **SUPERSEDED by ADR-014**
+- **Status:** superseded 2026-10-23; retained for history. The decision below is
+  wrong for the raw RGB TIFF.
 - **Context:** the old builder stored `mihc[...,2]`; labels are mIHC.
 - **Decision:** DAPI target is `ch0` in all builders/loaders/tests.
 - **Why:** ch2 is panCK; using it invalidates every DAPI claim.
-- **Consequences:** old 512 checkpoints/metrics/weights are a panCK ablation;
-  corrected 1024 H5 was rebuilt and verified with `tests/test_hemit_channels.py`.
+- **Consequences (historically recorded, now known false):** this ADR claimed
+  the old 512 checkpoints were a panCK ablation and the 1024 `ch0` H5 was
+  correct. In fact the 512 model is DAPI and the 1024 `ch0` is panCK; see
+  ADR-014.
 
 ### ADR-002 — H5 is authoritative; no example fallback (2026-10-22)
 - **Context:** the old unpaired loader fell back to `data/examples` and mixed
@@ -268,6 +289,22 @@ consequences. Add new entries; do not rewrite history.
   wrapper that never called the work.
 - **Consequences:** v3 added the guard and was confirmed by quota consumption;
   future kernel pushes check `kaggle quota` + logs/output, not just status.
+
+### ADR-014 — HEMIT RGB TIFF: ch2=DAPI, ch0=panCK (ACCEPTED 2026-10-23)
+- **Status:** accepted; reverses ADR-001 and supersedes it.
+- **Context:** pixel morphology, channel/H&E correlation, the legacy 512 H5
+  (`dapi == mihc[...,2]`), and the paper's colour convention ("DAPI blue, panCK
+  red, CD3 green") all show the raw RGB TIFF stores DAPI in the blue channel
+  (`ch2`). The official `post_process.py` comment (`ch0 #dapi`) is inconsistent
+  with the raw files.
+- **Decision:** use `DAPI_CHANNEL = 2`, `panCK = 0`, `CD3 = 1`; rebuild the
+  1024/256 H5 `dapi` from `mihc[...,2]`; re-label the legacy 512 model as DAPI
+  and the 1024 `ch0` models as the panCK ablation.
+- **Why:** the current 1024 "DAPI" models and R-006 are actually panCK→H&E; the
+  legacy 512 model's metrics (test SSIM 0.789) match the paper's DAPI target.
+- **Consequences:** invalidate all ch0 DAPI claims; re-run the reverse
+  comparison on ch2 if it is still a product requirement; correct public
+  weights/model cards only after verifying their source checkpoints.
 
 ---
 

@@ -4,30 +4,33 @@
 
 **Alpha research software. Not for clinical use.**
 
-The public checkpoints still resolve to an **H&E → panCK ablation**, not the
-corrected DAPI model. A channel-order bug caused the previous data pipeline to
-use `mihc[..., 2]` (panCK) as the target. The correct target is `mihc[..., 0]`
-(DAPI). A corrected DAPI baseline has now been trained, but it is **undertrained,
-not published, and not release quality**.
+> **CHANNEL CORRECTION 2026-10-23.** The raw HEMIT RGB TIFF stores
+> **`ch2=DAPI` (blue), `ch0=panCK` (red), `ch1=CD3` (green)**. The legacy 512
+> H&E→DAPI checkpoint is therefore the real DAPI model; the 1024 `ch0` models
+> and R-006 are the panCK ablation. ADR-014 is accepted, the 256 H5 has been
+> rebuilt on `ch2`, and the loader prefers `mihc[...,2]`. A corrected 1024 DAPI
+> model and a valid DAPI→H&E model are still pending. See
+> [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md).
 
 | Item | Value |
 |---|---|
 | Product target | Bidirectional H&E ↔ DAPI in one plugin/API |
-| Current release | One-way forward baseline only; not a bidirectional product |
+| Current release | One-way H&E→DAPI only; not a bidirectional product |
 | Task (intended) | H&E RGB → DAPI grayscale |
-| Task (current public weights) | H&E RGB → panCK (ablation only) |
-| Task (new internal baseline) | H&E RGB → DAPI grayscale (`ch0`) |
-| Direction | One-way; DAPI → H&E is not available |
-| Generator (current) | U-Net, 3 → 1, `ngf=64` |
+| Real DAPI weights | Legacy 512 H&E→DAPI (`ch2`); provenance re-verification pending |
+| 1024 `ch0` internal run | H&E → panCK (ablation; invalid for DAPI) |
+| DAPI → H&E | Not available (the 1024 `ch0` reverse run is panCK→H&E) |
+| Generator | U-Net, 3 → 1, `ngf=64` |
 | Discriminator | PatchGAN |
 | Losses | GAN + L1 + SSIM + optional DISTS + nuclei Dice |
 | Training data | HEMIT, 5,292 pairs (3,717 / 630 / 945) |
 | Native resolution | 1024 × 1024 |
-| Current training resolution | 512 px pretrain + 1024 px fine-tune |
+| Legacy training resolution | 512 px |
+| 1024 ablation resolution | 512 px pretrain + 1024 px fine-tune |
 | Framework | PyTorch |
-| Public weights | `resources/models/checkpoints/he2dapi/generator_last.pt` (ablation) |
-| DAPI baseline weights | `resources/models/checkpoints/he2dapi_dapi_1024/checkpoint_last.pt` (internal) |
-| Package weights | `he2dapi_unet_epoch169.pt` on Hugging Face (ablation) |
+| Public weights | `he2dapi_unet_epoch169.pt` (HF) and `resources/models/checkpoints/he2dapi/` — legacy 512 DAPI, re-verify |
+| Internal panCK ablation | `resources/models/checkpoints/he2dapi_dapi_1024/checkpoint_last.pt` — **panCK, not DAPI** |
+| Package weights | Legacy 512 H&E→DAPI; provenance re-verification pending |
 
 ## Intended use
 
@@ -40,38 +43,51 @@ not published, and not release quality**.
 
 - Clinical diagnosis, treatment selection, or pathology reporting.
 - Replacing real DAPI/IF staining in a regulated workflow.
-- Claims that the current checkpoint produces DAPI. It produces a panCK-like
-  channel from the ablation run.
+- Claims that the 1024 `ch0` checkpoint produces DAPI. It produces panCK.
 - Use on modalities, scanners, tissues, or stain protocols not represented in
   HEMIT without separate validation.
 
 ## Training data and labels
 
-HEMIT provides same-slide aligned H&E and mIHC patches. Label channels:
+HEMIT provides same-slide aligned H&E and mIHC patches. Raw label channels:
 
 | Channel | Marker |
 |---|---|
-| 0 | DAPI |
-| 1 | CD3 |
-| 2 | panCK |
+| 0 | panCK (red) |
+| 1 | CD3 (green) |
+| 2 | DAPI (blue) |
 
-The corrected builder stores all three channels and extracts DAPI explicitly.
-See [`DATA.md`](DATA.md). Dataset license: CC BY 4.0.
+The corrected builder stores all three channels and extracts DAPI from `ch2`.
+The 256px H5 was rebuilt on 2026-10-23 with `dapi_channel=2`; the 1024 H5
+`dapi` cache is stale (`ch0`) and is intentionally ignored by the loader in
+favour of `mihc[...,2]`. See [`DATA.md`](DATA.md) and
+[`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md). Dataset license: CC BY 4.0.
 
 ## Metrics
 
-### DAPI baseline metrics (internal)
+### Real DAPI baseline — legacy 512px, 200 epochs
 
-Corrected target `ch0`, 1024px fine-tune, full splits. This is a short baseline,
-not the paper protocol.
+Target `ch2`, full splits, local CPU. Non-paper protocol; provenance is being
+re-verified before release.
+
+| Split | n | SSIM | Pearson | PSNR (dB) |
+|---|---:|---:|---:|---:|
+| val | 630 | 0.739 | 0.507 | 29.23 |
+| test | 945 | 0.789 | 0.878 | 30.65 |
+
+### panCK ablation — 1024px `ch0` (not DAPI)
+
+Target `ch0`/panCK, 20 epochs at 512 + 1,000 steps at 1024, full splits. This
+is retained only as an engineering baseline (resumability, RAM behaviour, loss
+stability, inference plumbing). Do not copy these numbers into a DAPI model
+card.
 
 | Split | n | SSIM | Pearson | PSNR (dB) | Dice |
 |---|---:|---:|---:|---:|---:|
 | val | 630 | 0.670 | 0.255 | 28.77 | 0.104 |
 | test | 945 | 0.725 | 0.611 | 26.60 | 0.449 |
 
-The large val/test gap and low val Pearson/Dice mean this checkpoint is not
-release quality. Paper reference points (HEMIT DAPI column, not this repository):
+### External reference (HEMIT paper, DAPI column — not this repository)
 
 | Model | SSIM | Pearson | PSNR (dB) |
 |---|---:|---:|---:|
@@ -79,27 +95,24 @@ release quality. Paper reference points (HEMIT DAPI column, not this repository)
 | Pix2Pix U-Net | 0.775 | 0.652 | 27.691 |
 | Dual-branch | 0.815 | 0.716 | 28.610 |
 
-### Ablation metrics (panCK, not DAPI)
-
-The 512px CPU run and `docs/metrics_eval.json` describe the panCK ablation.
-They must not be copied into a DAPI model card. The run is retained only as an
-engineering baseline (resumability, RAM behavior, loss stability, inference
-plumbing).
-
 ## Limitations and failure modes
 
-- **Wrong target in public weights.** The current demo is panCK; the corrected
-  DAPI baseline is internal only.
+- **No valid DAPI→H&E model.** The only reverse checkpoint was trained on
+  panCK `ch0`; it must not be presented as DAPI→H&E.
+- **No 1024 DAPI model yet.** The 1024 `ch0` run is panCK; a `ch2` retrain is
+  pending.
+- **Provenance.** The legacy 512 weights and demo need checkpoint-level
+  verification before they are published as DAPI.
 - **Domain shift.** HEMIT is a specific same-slide mIHC dataset; generalization
   is unknown.
 - **Alignment.** The paired setup assumes aligned H&E/mIHC patches. Misalignment
   is a known failure mode in virtual staining.
-- **Resolution.** The baseline was pretrained at 512px and only briefly
-  fine-tuned at 1024px; WSI-scale morphology is not validated.
+- **Resolution.** The legacy model is 512px; WSI-scale morphology is not
+  validated.
 - **Architecture.** The code currently uses a U-Net baseline, not the
   dual-branch Swin/FMF architecture described in the HEMIT paper.
-- **Evaluation size.** The new DAPI baseline uses full 630/945 splits; older
-  panCK numbers were only a 30-image subset.
+- **DAPI dynamic range.** DAPI is sparse and low-contrast (mean ~11/255,
+  p99 ~51); normalization choices materially affect training and display.
 - **Stain variability.** Macenko normalization is optional and scanner/stain
   variation can change outputs.
 - **Deployment.** Full 1024px inference is not expected to fit comfortably in
@@ -114,12 +127,12 @@ reporting. The software is provided under MIT without warranty.
 
 ## Planned corrected release
 
-1. ~~Build corrected 1024px HEMIT HDF5 (`dapi = ch0`, Macenko).~~ Done.
-2. ~~Train a first U-Net DAPI baseline on a T4.~~ Done; undertrained.
-3. Improve/retrain with more 1024 steps or the dual-branch generator.
-4. Evaluate full validation and test splits with mean ± std / CIs.
-5. Train paired reverse DAPI → H&E, then unpaired CycleGAN.
-6. Publish corrected weights with a manifest that states the target channel and
-   evaluation split only after metrics are reproducible.
+1. ~~Rebuild 256px HEMIT HDF5 with `dapi = mihc[...,2]`.~~ Done and verified.
+2. Re-verify the legacy 512 DAPI checkpoint provenance and record channel/split.
+3. Train a 1024px DAPI model on `ch2` (paired U-Net first, then dual-branch).
+4. Train and evaluate a valid DAPI→H&E model on `ch2`.
+5. Evaluate full validation and test splits with mean ± std / CIs.
+6. Publish weights with a manifest stating target channel and split only after
+   metrics are reproducible.
 7. Update PyPI, Hugging Face, Docker, and the demo only after the DAPI metrics
    are reproducible.

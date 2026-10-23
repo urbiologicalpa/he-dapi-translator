@@ -9,8 +9,13 @@ Stages (set DAPI_STAGE):
   all       - pretrain then finetune in one kernel (no checkpoint dataset needed)
 
 Direction (set DAPI_DIRECTION):
-  he2dapi   - default, H&E input -> DAPI ch0 output
-  dapi2he   - reverse, DAPI ch0 input -> H&E output
+  he2dapi   - default, H&E input -> DAPI ch2 (blue) output
+  dapi2he   - reverse, DAPI ch2 (blue) input -> H&E output
+  both      - run forward then reverse in one session (quota-efficient)
+
+The attached H5 is named `...-ch0-macenko` for history, but its `mihc` field is
+intact; the corrected loader reads `mihc[...,2]` (DAPI blue) and ignores the
+stale `dapi` cache.
 
 Attach:
   bikasash/hemit-dapi-1024-ch0-macenko
@@ -27,9 +32,12 @@ from pathlib import Path
 
 STAGE = os.environ.get("DAPI_STAGE", "smoke").lower()
 DIRECTION = os.environ.get("DAPI_DIRECTION", "he2dapi").lower()
-if DIRECTION not in {"he2dapi", "dapi2he"}:
+if DIRECTION not in {"he2dapi", "dapi2he", "both"}:
     raise SystemExit(f"unknown DAPI_DIRECTION={DIRECTION}")
 TAG = "dapi" if DIRECTION == "he2dapi" else "dapi2he"
+PRETRAIN_EPOCHS = int(os.environ.get("DAPI_PRETRAIN_EPOCHS", "20"))
+FINETUNE_EPOCHS = int(os.environ.get("DAPI_FINETUNE_EPOCHS", "2"))
+FINETUNE_STEPS = int(os.environ.get("DAPI_FINETUNE_STEPS", "500"))
 ROOT = Path("/kaggle/working/he-dapi")
 CKPT_ROOT = Path("/kaggle/working/checkpoints")
 INPUT = Path("/kaggle/input")
@@ -139,7 +147,7 @@ def train_stage(stage: str, h5: Path) -> None:
         if incoming and not any(ckpt_dir.glob("checkpoint_*.pt")):
             shutil.copy2(incoming, ckpt_dir / "checkpoint_last.pt")
             print(f"resume checkpoint {incoming} -> {ckpt_dir}")
-        extra = ["--resume", "auto", "--epochs", "20"]
+        extra = ["--resume", "auto", "--epochs", str(PRETRAIN_EPOCHS)]
     elif stage == "finetune":
         config = ROOT / f"configs/hemit_{TAG}_1024.yaml"
         seed = CKPT_ROOT / f"{TAG}_pretrain/checkpoint_last.pt"
@@ -156,9 +164,9 @@ def train_stage(stage: str, h5: Path) -> None:
             print(f"initialized 1024 from {seed}")
             # Pretrain checkpoint has a high epoch counter; reset it so fine-tune
             # actually runs epochs 1..2 at the lower 1024 LR.
-            extra = ["--resume", str(ckpt_dir / "checkpoint_last.pt"), "--resume-epoch", "0", "--epochs", "2", "--max-steps", "500"]
+            extra = ["--resume", str(ckpt_dir / "checkpoint_last.pt"), "--resume-epoch", "0", "--epochs", str(FINETUNE_EPOCHS), "--max-steps", str(FINETUNE_STEPS)]
         else:
-            extra = ["--resume", "auto", "--epochs", "2", "--max-steps", "500"]
+            extra = ["--resume", "auto", "--epochs", str(FINETUNE_EPOCHS), "--max-steps", str(FINETUNE_STEPS)]
     elif stage == "quality":
         config = ROOT / f"configs/hemit_{TAG}_quality_1024.yaml"
         if not config.exists():
@@ -219,8 +227,14 @@ def main() -> None:
         print(torch.cuda.get_device_name(0))
 
     stages = ["pretrain", "finetune"] if STAGE == "all" else [STAGE]
-    for stage in stages:
-        train_stage(stage, h5)
+    global DIRECTION, TAG
+    directions = ["he2dapi", "dapi2he"] if DIRECTION == "both" else [DIRECTION]
+    for direction in directions:
+        DIRECTION = direction
+        TAG = "dapi" if direction == "he2dapi" else "dapi2he"
+        print(f"=== DIRECTION {DIRECTION} TAG {TAG} ===", flush=True)
+        for stage in stages:
+            train_stage(stage, h5)
 
 
 if __name__ == "__main__":

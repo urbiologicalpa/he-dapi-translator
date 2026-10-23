@@ -31,7 +31,7 @@ And BOTH user types: researchers + pathologists.
 **Since no own data, source internet:**
 
 Priority datasets (see `resources/datasets/README.md`):
-1. **HEMIT (MICCAI 2024)** - 5,292 pairs (3,717/630/945), SAME slide, cellular-level aligned, H&E <-> DAPI/CD3/panCK, 1024x1024. BEST for paired training. Contact: ImmunoAIzer derived. Use central 512x512 crop only for the legacy CPU baseline; corrected DAPI training uses native 1024.
+1. **HEMIT (MICCAI 2024)** - 5,292 pairs (3,717/630/945), SAME slide, cellular-level aligned, H&E <-> DAPI/CD3/panCK, 1024x1024. BEST for paired training. Contact: ImmunoAIzer derived. Use central 512x512 crop for the legacy 512 DAPI baseline; corrected DAPI training uses native 1024 and `ch2`.
 2. **BCI (Breast HER2)** - consecutive sections, not aligned -> for unpaired test.
 3. **CODEX Virtual H&E examples (PMC8721868)** - DAPI + Eosin -> virtual H&E, has code + example data.
 4. **Autofluorescence -> H&E Lung (medRxiv 2024)** - mIF panel includes DAPI.
@@ -75,15 +75,15 @@ Metrics (see `resources/models/README.md`):
 
 ### Phase 2.5 — Benchmark & release gates (after epoch 200)
 
-**What ships after the 200-epoch run:** an **internal ablation benchmark**, not a
-DAPI model and not a tagged product release. The run is H&E -> panCK because of
-the old channel bug. Shipping it as DAPI would be false.
+**What ships after the 200-epoch run:** an **internal legacy DAPI baseline**
+(`ch2`), not a tagged product release. The separate 1024 `ch0` run is the
+panCK ablation; shipping that as DAPI would be false.
 
 Deliverables:
 
 - [x] Archive `checkpoint_epoch200.pt`, `generator_last.pt`, config, git SHA and
       checkpoint hash in `docs/ABLATION_PANCK.md`.
-- [x] Run full panCK evaluation on **630 val + 945 test** using the legacy 512px
+- [x] Run full evaluation on **630 val + 945 test** using the legacy 512px DAPI
       H5; write `docs/metrics_panck_512.json`.
 - [x] Fill `docs/BENCHMARK.md` with measured panCK numbers, clearly labeled.
 - [x] Keep weights internal; publish only the engineering note and metrics in
@@ -166,7 +166,7 @@ See `docs/NOVELTY_REPORT.md` (summary: H&E->DAPI well-published since 2024, but 
 
 ## 5. Immediate Next Steps (2026-10-20)
 1. Wait for the panCK epoch-200 checkpoint; archive it as an ablation.
-2. Run full `val`/`test` panCK evaluation into `docs/metrics_panck_512.json`
+2. Run full `val`/`test` legacy-512 DAPI evaluation into `docs/metrics_dapi_512_legacy.json`
    using `src/models/eval_offline.py --out ... --label ... --target ...`.
 3. Publish the internal ablation note and metrics in git (no release tag).
 4. Build corrected 1024px HDF5 with `scripts/data/pack_hemit_1024.py`.

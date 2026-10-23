@@ -1,10 +1,28 @@
 # Kaggle DAPI runbook and status
 
+> **INVALID FOR DAPI (2026-10-23).** Everything in this historical runbook used
+> `ch0`, which is **panCK (red)**, not DAPI. The 1024 forward/reverse models and
+> all metrics here are panCK ablations. Do not reuse them as DAPI. For DAPI, use
+> `mihc[...,2]` (`ch2`), the rebuilt 256 H5, and new `-ch2-` Kaggle datasets
+> (not yet uploaded). See [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md).
+
 Last checked: **2026-10-22 06:03 UTC**
+
+## 2026-10-23 corrected ch2 run (active)
+
+- Kernel: `bikasash/he-dapi-paired-ch2-1024-both` v1 (T4, private).
+- Data: `bikasash/hemit-dapi-1024-ch0-macenko` (payload name historical;
+  `mihc` intact) + `bikasash/he-dapi-code-dapi-1024` v2026-10-23 04:53.
+- Config: `DAPI_DIRECTION=both`, `DAPI_STAGE=all`, 14 epochs @512 +
+  2×500 steps @1024 per direction.
+- Rationale: 6.18 h quota remaining; 14 epochs fits with buffer, 20 does not.
+- Output dirs: `checkpoints/dapi_*` (forward), `checkpoints/dapi2he_*`
+  (reverse).
+- Do **not** evaluate these as `ch0`; the loader reads `mihc[...,2]`.
 
 ## Current status
 
-- Corrected `hemit_*_1024.h5` is built and verified locally:
+- 1024 H5 is built; its `dapi` cache is `ch0`/panCK (loader now reads `mihc[...,2]`):
   - train 11.5 GB, 3,717 pairs
   - val 2.1 GB, 630 pairs
   - test 3.0 GB, 945 pairs
@@ -27,9 +45,9 @@ Last checked: **2026-10-22 06:03 UTC**
   - val 630: SSIM 0.6702, Pearson 0.2547, PSNR 28.77, Dice 0.1036
   - test 945: SSIM 0.7253, Pearson 0.6107, PSNR 26.60, Dice 0.4489
   - Metrics saved as `docs/metrics_dapi_1024_{val,test}.json`
-- Test dataset `bikasash/hemit-dapi-1024-ch0-test` was ready and attached.
+- Test dataset `bikasash/hemit-dapi-1024-ch0-test` was attached; it is panCK data, not DAPI.
 - This baseline is undertrained, not release quality.
-- **Reverse paired DAPI → H&E training complete** in
+- **Reverse panCK (`ch0`) → H&E training complete** in
   `bikasash/he-dapi-dapi2he-1024`:
   - 512 pretrain: 20/20 epochs, final G `14.8121`, D `0.5576`.
   - 1024 fine-tune: 2/2 epochs ×500 steps, final G `14.8727`, D `0.5629`.

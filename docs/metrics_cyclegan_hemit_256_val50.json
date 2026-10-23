@@ -1,0 +1,23 @@
+{
+  "checkpoint": "/tmp/k256_eval/checkpoints/hemit_cyclegan_dapi2he_256/cyclegan_G_last.pt",
+  "file_epoch": 0,
+  "split": "val",
+  "direction": "dapi2he",
+  "resolution": 256,
+  "n": 50,
+  "train_G_loss": 0.0,
+  "val_L1": 0.2292,
+  "val_PSNR_dB": 11.37,
+  "val_SSIM": 0.2216,
+  "val_Pearson": 0.1596,
+  "val_SSIM_loss_proxy": 0.0835,
+  "val_Dice_thresh01": null,
+  "val_D_loss": 0.6934,
+  "val_FID": 367.97,
+  "val_LPIPS": 0.5948,
+  "metric_n": 50,
+  "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
+  "evaluated": "2026-10-23T02:54:21.077004+00:00",
+  "label": "cyclegan-hemit-dapi2he-256-val50",
+  "target": "H&E (HEMIT unpaired)"
+}

@@ -141,13 +141,14 @@ class PairedHEMITDataset(Dataset):
         if self._h5_path and Path(self._h5_path).exists() and h5py:
             h5f = self._get_h5()
             he = h5f["he"][real_idx]  # HxWx3 uint8
-            # handle both "dapi" and "mihc" naming (HEMIT stores mihc 3ch + dapi 1ch)
-            if "dapi" in h5f:
-                dapi = h5f["dapi"][real_idx]  # HxW or HxWx3
-            elif "mihc" in h5f:
+            # HEMIT raw RGB storage: ch0=panCK (red), ch1=CD3 (green),
+            # ch2=DAPI (blue). Prefer mihc[...,2] over the stored `dapi`
+            # cache, because pre-audit 1024 H5 files cached the wrong ch0.
+            if "mihc" in h5f:
                 mihc = h5f["mihc"][real_idx]
-                # HEMIT channel order is DAPI, CD3, panCK. DAPI is ch0.
-                dapi = mihc[...,0] if mihc.ndim==3 else mihc
+                dapi = mihc[...,2] if mihc.ndim==3 else mihc
+            elif "dapi" in h5f:
+                dapi = h5f["dapi"][real_idx]  # HxW or HxWx3 (ch2 in legacy 512)
             else:
                 dapi = h5f["he"][real_idx][...,0]  # fallback
             if dapi.ndim==3:
@@ -359,8 +360,14 @@ class UnpairedDataset(Dataset):
         if self._dapi_h5 and (not self._dapi_real_files or np.random.rand() < 0.5):
             h5f = self._get_dapi_h5()
             if h5f is not None:
-                ri = np.random.randint(0, h5f["dapi"].shape[0] if "dapi" in h5f else h5f["he"].shape[0])
-                if "dapi" in h5f:
+                n_h5 = h5f["mihc"].shape[0] if "mihc" in h5f else (h5f["dapi"].shape[0] if "dapi" in h5f else h5f["he"].shape[0])
+                ri = np.random.randint(0, n_h5)
+                if "mihc" in h5f:
+                    # HEMIT RGB: ch0=panCK, ch1=CD3, ch2=DAPI. Prefer ch2
+                    # even if the H5 carries a wrong pre-audit `dapi` cache.
+                    dapi = h5f["mihc"][ri]
+                    dapi = dapi[...,2] if dapi.ndim==3 else dapi
+                elif "dapi" in h5f:
                     dapi = h5f["dapi"][ri]
                     if dapi.ndim==3: dapi = dapi[...,0]
                 else:

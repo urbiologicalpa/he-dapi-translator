@@ -1,7 +1,10 @@
 # Reverse architecture selection (Stage 2.4)
 
-> **Status: PENDING R-006.** Do not fill with guesses. Update after the corrected
-> HEMIT 256px CycleGAN exits and its val evaluation is pulled.
+> **Status: BLOCKED — INVALID TARGET (2026-10-23).** Both candidates were
+> trained on `ch0`, which the channel audit identifies as **panCK**, not DAPI.
+> R-006 is a panCK→H&E result; do not select a DAPI architecture from it.
+> See [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md). ADR-014 is accepted and the 256
+> H5 is rebuilt; re-run on `ch2` before selecting a DAPI architecture.
 > Decision rule: `docs/PLAN.md` Stage 2.3 / ADR-008 (val only, test once).
 
 ## Question
@@ -25,8 +28,13 @@ evaluation crops, and validation data only.
 
 | Model | Target domain | n | FID ↓ | LPIPS ↓ | PSNR | SSIM | L1 ↓ |
 |---|---|---:|---:|---:|---:|---:|---:|
-| Paired reverse 1024 @256 | HEMIT H&E | 50* | 342.98 | 0.5904 | 13.17 | 0.4941 | 0.2056 |
-| CycleGAN HEMIT 256 (R-006) | HEMIT H&E | 630 |  |  |  |  |  |
+| Paired reverse 1024 @256 (**ch0 panCK**) | HEMIT H&E | 50 | 342.98 | 0.5904 | 13.17 | 0.4941 | 0.2056 |
+| CycleGAN HEMIT 256 (R-006, **ch0 panCK**) | HEMIT H&E | 50 | 367.97 | 0.5948 | 11.37 | 0.2216 | 0.2292 |
+
+**Warning:** both rows are panCK→H&E, not DAPI→H&E. They are not valid for the
+reverse DAPI decision. The R-006 630-crop JSON (L1 0.2543, PSNR 10.61, SSIM
+0.2051, Pearson 0.1537) is in `/tmp/k256_eval/`; the 50-crop row above is the
+fair comparison to the paired baseline.
 
 \*The paired reference FID/LPIPS was measured on 50 val crops. Re-run the paired
 checkpoint with `--num 630` before declaring a winner if the unpaired run used

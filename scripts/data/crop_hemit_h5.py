@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Crop corrected HEMIT HDF5 splits to a smaller training size.
+"""Crop HEMIT HDF5 splits to a smaller training size with the correct DAPI.
 
-The unpaired CycleGAN reads random 1024px gzip chunks from the 11.5GB train H5,
-which is slow on Kaggle (~6 s/step, ~1.5 h/epoch). This streams each source
-image once and writes 256px ``he``/``dapi`` patches with fast LZF compression,
-so training reads ~15x fewer bytes per sample.
+DAPI is the blue channel: ``mihc[...,2]``. The script deliberately ignores a
+stored ``dapi`` cache if it is wrong (pre-audit 1024 H5 used ch0/panCK). It
+streams each source image once and writes 256px ``he``/``dapi`` patches with
+fast LZF compression, so training reads ~15x fewer bytes per sample.
 
 Usage:
   python -m scripts.data.crop_hemit_h5 --src data/processed/hemit_train_1024.h5 \
@@ -37,6 +37,7 @@ def is_complete(path: Path, n: int, size: int) -> bool:
             return (
                 int(f.attrs.get("patch_size", -1)) == size
                 and "he" in f and "dapi" in f
+                and int(f.attrs.get("dapi_channel", -1)) == 2
                 and f["he"].shape == (n, size, size, 3)
                 and f["dapi"].shape == (n, size, size)
             )
@@ -59,9 +60,13 @@ def build(src: Path, out: Path, size: int, compression: str, overwrite: bool) ->
                              chunks=(1, size, size, 3), **opts)
             d.create_dataset("dapi", (n, size, size), dtype="uint8",
                              chunks=(1, size, size), **opts)
+            has_mihc = "mihc" in f
             for i in range(n):
                 he = center_crop(f["he"][i], size)
-                dapi = center_crop(f["dapi"][i], size)
+                if has_mihc:
+                    dapi = center_crop(f["mihc"][i][..., 2], size)
+                else:
+                    dapi = center_crop(f["dapi"][i], size)
                 d["he"][i] = he
                 d["dapi"][i] = dapi
                 if (i + 1) % 200 == 0 or i + 1 == n:
@@ -73,6 +78,8 @@ def build(src: Path, out: Path, size: int, compression: str, overwrite: bool) ->
                     d.attrs[k] = v
             d.attrs["patch_size"] = size
             d.attrs["num_pairs"] = n
+            d.attrs["dapi_channel"] = 2
+            d.attrs["channel_order"] = "panCK,CD3,DAPI"
             d.attrs["derived_from"] = src.name
             d.attrs["compression"] = compression
         os.replace(tmp, out)

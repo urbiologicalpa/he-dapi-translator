@@ -1,7 +1,7 @@
 {
   "project": "he-dapi-translator",
-  "updated": "2026-10-22T17:22:00Z",
-  "status": "alpha; corrected 256 HEMIT CycleGAN RUNNING v3 on Kaggle T4; invalid 14:25 run cancelled; reverse selection pending",
+  "updated": "2026-10-23T04:57:00Z",
+  "status": "IN_PROGRESS: ADR-014 accepted; ch2 DAPI data rebuilt/verified; 1024 ch0 and R-006 remain panCK; legacy 512 DAPI provenance next",
   "overall_percent": 50,
   "machine": {
     "cpu": "Intel i5-10210U 8vCPU 4c/8t",
@@ -15,15 +15,48 @@
     "wsi_canvas_budget_mb": 512
   },
   "critical_correction": {
-    "date": "2026-10-20",
-    "issue": "HEMIT labels are ch0=DAPI, ch1=CD3, ch2=panCK; the previous pipeline used ch2.",
-    "impact": "The current checkpoints, docs/metrics_eval.json, HF weights and demo are an H&E -> panCK ablation, not DAPI.",
+    "date": "2026-10-23",
+    "issue": "Raw HEMIT RGB TIFF evidence shows ch2=DAPI (blue), ch0=panCK (red), ch1=CD3 (green). ADR-001 is reversed by accepted ADR-014.",
+    "impact": "Legacy 512 model/weights/demo are the real H&E->DAPI model. The 1024 ch0 forward/reverse models and R-006 are panCK; all DAPI claims are frozen.",
+    "audit": "docs/CHANNEL_AUDIT.md",
     "fixed_in": [
-      "scripts/data/pack_hemit.py",
       "scripts/data/pack_hemit_1024.py",
+      "scripts/data/pack_hemit.py",
+      "scripts/data/crop_hemit_h5.py",
       "src/models/datasets.py",
-      "tests/test_hemit_channels.py"
-    ]
+      "tests/test_hemit_channels.py",
+      "configs/hemit_dapi_512_pretrain.yaml",
+      "configs/hemit_dapi_1024.yaml"
+    ],
+    "status": "code_corrected_data_rebuilt_verified",
+    "rebuild": {
+      "status": "complete",
+      "pid": 13311,
+      "log": "logs/rebuild_256_ch2.log",
+      "started_utc": "2026-10-23T04:31:34Z",
+      "command": "crop_hemit_h5.py --size 256 (val, test, train) with dapi=mihc[...,2]",
+      "outputs": [
+        "data/processed/hemit_val_256.h5",
+        "data/processed/hemit_test_256.h5",
+        "data/processed/hemit_train_256.h5"
+      ],
+      "invalid_backups": [
+        "data/processed/hemit_{train,val,test}_256_ch0_invalid.h5"
+      ],
+      "completed_utc": "2026-10-23T04:35:46Z",
+      "verified": "dapi == mihc[...,2] center crop; attrs dapi_channel=2; tests 51 passed/1 skipped"
+    },
+    "legacy_dapi_reverified": {
+      "checkpoint_sha256": "6789d7d244cc6ac93dffd98a30ed2c17498aa7ee6081560dedac5173b44042aa",
+      "n": 50,
+      "FID": 146.27,
+      "LPIPS": 0.2468,
+      "PSNR": 29.52,
+      "SSIM": 0.7662,
+      "Pearson": 0.5323,
+      "L1": 0.0221,
+      "json": "docs/metrics_dapi_512_legacy_val50.json"
+    }
   },
   "phases": [
     {
@@ -41,7 +74,7 @@
     {
       "id": 1,
       "name": "Data",
-      "status": "DONE_CORRECTED",
+      "status": "DONE",
       "percent": 100,
       "artifacts": [
         "scripts/data/pack_hemit_1024.py",
@@ -54,7 +87,7 @@
     {
       "id": 2,
       "name": "Modeling",
-      "status": "IN_PROGRESS",
+      "status": "BLOCKED_AUDIT",
       "percent": 60,
       "artifacts": [
         "src/models/train_paired.py (U-Net baseline, bidirectional)",
@@ -106,11 +139,10 @@
     }
   ],
   "next_actions": [
-    "Cancel invalid Kaggle run bikasash/he-dapi-cyclegan-hemit-dapi2he-1024 (stale code bundle mixed data/examples)",
-    "Launch corrected 256px HEMIT CycleGAN and verify H5-only log lines + CUDA",
-    "Write docs/selection_reverse.md: paired vs unpaired on val FID/LPIPS + blinded qualitative",
-    "Spend next GPU budget on the selected reverse architecture quality pass (val-only selection)",
-    "Update README status and rotate the exposed Kaggle token"
+    "Decide whether to launch a corrected ch2 DAPI\u2192H&E run with the remaining Kaggle quota (~6h)",
+    "If yes: upload rebuilt 256 ch2 H5 or rebuild a -ch2- Kaggle dataset, then run paired/CycleGAN",
+    "Rotate the exposed Kaggle token",
+    "Re-run full 630/945 legacy DAPI eval only if needed for release provenance"
   ],
   "daily_log": [
     {
@@ -136,6 +168,10 @@
     {
       "date": "2026-10-22",
       "note": "Reverse paired baseline eval complete (val SSIM 0.437). WSL host OOM during local unpaired run (swap exhausted); stopped local. Found running Kaggle HEMIT CycleGAN mounted stale 14:23 code bundle mixing data/examples 50/50 -> invalid. Added H5-authoritative loader, grad checkpointing, safe cgroup launcher, LIVE_STATE.md and PLAN.md v2.0. Corrected 256 kernel/code dataset staged."
+    },
+    {
+      "date": "2026-10-23",
+      "note": "Accepted ADR-014 (ch2=DAPI). Corrected packers, crop script, loader precedence, tests, and configs. Rebuilding 256 H5 from mihc[...,2]; old ch0 derivatives quarantined. R-006 and 1024 ch0 remain panCK-only."
     }
   ],
   "kaggle": {
@@ -220,7 +256,7 @@
       "reason": "stale 2026-10-22T14:23 code bundle; UnpairedDataset fell back to data/examples ~50%",
       "action": "cancel; metrics must not be used",
       "corrected": {
-        "status": "running",
+        "status": "complete_invalid_target",
         "kernel": "bikasash/he-dapi-cyclegan-hemit-dapi2he-256",
         "code_dataset": "bikasash/he-dapi-code-hemit-256",
         "staging": "/tmp/kaggle_kernel_hemit256",
@@ -229,8 +265,49 @@
         "budget_hours": 1.5,
         "version": 3,
         "pushed_utc": "2026-10-22T17:20:00Z",
-        "note": "v1/v2 exited in ~6s because wrapper lacked if __name__ == \"__main__\"; v3 fixed and confirmed by GPU quota consumption"
+        "note": "Completed exit 0, H5-only, AMP; target is ch0=panCK, not DAPI. Do not use as DAPI.",
+        "completed_utc": "2026-10-22T18:55:00Z",
+        "result_val50": {
+          "n": 50,
+          "FID": 367.97,
+          "LPIPS": 0.5948,
+          "PSNR": 11.37,
+          "SSIM": 0.2216,
+          "L1": 0.2292,
+          "Pearson": 0.1596
+        },
+        "result_val630": {
+          "n": 630,
+          "PSNR": 10.61,
+          "SSIM": 0.2051,
+          "L1": 0.2543,
+          "Pearson": 0.1537,
+          "FID": null,
+          "LPIPS": null
+        }
       }
+    },
+    "channel_audit": {
+      "status": "BLOCKER",
+      "dapi_channel": 2,
+      "panck_channel": 0,
+      "cd3_channel": 1,
+      "doc": "docs/CHANNEL_AUDIT.md"
+    },
+    "corrected_ch2_run": {
+      "status": "running",
+      "kernel": "bikasash/he-dapi-paired-ch2-1024-both",
+      "version": 1,
+      "pushed_utc": "2026-10-23T04:54:00Z",
+      "direction": "both",
+      "stage": "all",
+      "pretrain_epochs": 14,
+      "finetune_epochs": 2,
+      "finetune_steps": 500,
+      "data": "bikasash/hemit-dapi-1024-ch0-macenko (mihc intact; loader ch2)",
+      "code_dataset": "bikasash/he-dapi-code-dapi-1024 v2026-10-23 04:53",
+      "quota_remaining_hours_at_launch": 6.18,
+      "stop_rule": "cancel if a direction exceeds ~2.4h before fine-tune"
     }
   }
 }

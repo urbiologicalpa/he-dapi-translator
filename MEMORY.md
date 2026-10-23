@@ -1,5 +1,13 @@
 # MEMORY - H&E <-> DAPI Session Checkpoint 2026-09-27
 
+> **2026-10-23 CHANNEL CORRECTION — reverses the 2026-10-20 correction.**
+> Raw HEMIT RGB TIFF: **ch2=DAPI (blue), ch0=panCK (red), ch1=CD3 (green)**.
+> The legacy 512 model/weights/demo are the **real H&E→DAPI** model. The 1024
+> `ch0` forward/reverse models and R-006 are **panCK**. ADR-014 is accepted; the
+> 256 H5 is rebuilt on `ch2` and the loader reads `mihc[...,2]`. A corrected
+> 1024 DAPI model and a valid DAPI→H&E model are still pending.
+> Evidence: `docs/CHANNEL_AUDIT.md`; live state: `docs/LIVE_STATE.md`.
+
 > **2026-10-22 PLAN v2.0 → `docs/PLAN.md`; LIVE STATE → `docs/LIVE_STATE.md`.**
 > Read the plan for stages/decisions and the live file before any launch or
 > after any crash. Current: Phase 2 HEMIT CycleGAN; local run STOPPED (swap
@@ -11,15 +19,12 @@
 > Local fix: H5-only `datasets.py`, grad checkpointing, 2.5GB cgroup launcher.
 > Snapshot: `bash scripts/status.sh`.
 
-> **2026-10-20 correction:** HEMIT labels are `ch0=DAPI, ch1=CD3, ch2=panCK`.
-> The previous 512px pipeline used `ch2`, so the epoch-199/200 run, current HF
-> weights, demo, and `docs/metrics_eval.json` are a **panCK ablation, not DAPI**.
-> Fixes: `scripts/data/pack_hemit.py`, `scripts/data/pack_hemit_1024.py`,
-> `src/models/datasets.py`, `tests/test_hemit_channels.py`. Current canonical
-> status: `README.md`, `docs/MODEL_CARD.md`, `docs/RESULTS.md`, `docs/TRACKER.md`.
-> Kaggle T4 path is verified (2x T4 15.64GB); corrected 1024px DAPI training is
-> the next milestone. Everything below this banner is historical unless it
-> agrees with the 2026-10-20 docs.
+> **2026-10-20 correction (now known wrong):** it claimed `ch0=DAPI` and
+> relabelled the legacy 512 run as panCK. The opposite is true: `ch2=DAPI`,
+> `ch0=panCK`. The legacy 512 run is the real DAPI model; the 1024 `ch0` run is
+> the panCK ablation. Current canonical status: `README.md`,
+> `docs/MODEL_CARD.md`, `docs/RESULTS.md`, `docs/TRACKER.md`. The next milestone
+> is a corrected 1024/`ch2` DAPI baseline, not another `ch0` run.
 
 > Updated 2026-10-18 15:25 UTC: 🟢 RUNNING PID1081 epoch183/200 (~91%). **ALL SHIPPED**: GitHub **Release v0.1.0** + prod promote (GHCR `:v0.1.0`+`:latest`); **HF model repo + FREE Static Space (in-browser ONNX) demo**; GitHub Pages; **PyPI packages `he-dapi` + `napari-he-dapi` v0.1.1 (alpha)** (`pip install he-dapi`); package + dummy-training tests in CI. Fixed cd-production (tag-push-only trigger + pinned checkout). ~17 left → ~Oct-20, pace ~2.4h/ep, best ep169 1.5302. KAGGLE OFF. Tokens: `~/.github_pat`, `~/.hf_token`, `~/.pypi_token` (all 600).
 

@@ -22,10 +22,11 @@ Only valid DAPI runs belong here. The first row is **val / test**; it is a short
 
 | Method | Target | Res | Train data | Epochs | SSIM ↑ | Pearson ↑ | PSNR ↑ | Dice ↑ | Params | Status |
 |---|---|---:|---|---:|---:|---:|---:|---:|---:|---|
-| U-Net baseline | DAPI ch0 | 512 | 3,717 | 100 | TBD | TBD | TBD | TBD | TBD | planned |
-| U-Net baseline | DAPI ch0 | 1024 | 3,717 | 100 | TBD | TBD | TBD | TBD | TBD | planned |
-| Pix2Pix U-Net (this repo) | DAPI ch0 | 1024 | 3,717 | 20@512 + 1k@1024 | 0.670 / 0.725 | 0.255 / 0.611 | 28.77 / 26.60 | 0.104 / 0.449 | 6.17M | val / test; undertrained |
-| Dual-branch Swin+FMF | DAPI ch0 | 1024 | 3,717 | 100 | TBD | TBD | TBD | TBD | TBD | planned |
+| U-Net baseline | DAPI ch2 | 512 | 3,717 | 100 | TBD | TBD | TBD | TBD | TBD | planned |
+| U-Net baseline | DAPI ch2 | 1024 | 3,717 | 100 | TBD | TBD | TBD | TBD | TBD | planned |
+| Legacy CPU baseline (this repo) | DAPI ch2 | 512 | 3,717 | 200 | 0.739 / 0.789 | 0.507 / 0.878 | 29.23 / 30.65 | — | 6.17M | val / test; real DAPI, non-paper protocol |
+| Pix2Pix U-Net, ch0 (invalid) | panCK ch0 | 1024 | 3,717 | 20@512 + 1k@1024 | 0.670 / 0.725 | 0.255 / 0.611 | 28.77 / 26.60 | 0.104 / 0.449 | 6.17M | panCK ablation; not DAPI |
+| Dual-branch Swin+FMF | DAPI ch2 | 1024 | 3,717 | 100 | TBD | TBD | TBD | TBD | TBD | planned |
 | Paper U-Net | DAPI | 1024 | HEMIT | — | 0.791 | 0.659 | 27.929 | — | — | external |
 | Paper dual-branch | DAPI | 1024 | HEMIT | — | 0.815 | 0.716 | 28.610 | — | — | external |
 
@@ -35,15 +36,18 @@ Change one variable at a time.
 
 | Scenario | Target | Res | Macenko | Flips | SSIM | Pearson | PSNR | Purpose |
 |---|---|---:|---:|---:|---:|---:|---:|---|
-| Correct target | DAPI ch0 | 1024 | yes | no | 0.670 / 0.725 | 0.255 / 0.611 | 28.8 / 26.6 | main; 1k fine-tune steps |
-| Wrong target (legacy) | panCK ch2 | 512 | no | yes | 0.739 / 0.789 | 0.507 / 0.878 | 29.2 / 30.6 | pipeline baseline only |
-| No normalization | DAPI ch0 | 1024 | no | no | TBD | TBD | TBD | stain sensitivity |
-| Resolution | DAPI ch0 | 512 vs 1024 | yes | no | TBD | TBD | TBD | resolution effect |
-| Architecture | DAPI ch0 | 1024 | yes | no | TBD | TBD | TBD | U-Net vs dual-branch |
+| Wrong target | panCK ch0 | 1024 | yes | no | 0.670 / 0.725 | 0.255 / 0.611 | 28.8 / 26.6 | ablation only; not DAPI |
+| Legacy target (valid) | DAPI ch2 | 512 | no | yes | 0.739 / 0.789 | 0.507 / 0.878 | 29.2 / 30.6 | 200-epoch legacy baseline |
+| No normalization | DAPI ch2 | 1024 | no | no | TBD | TBD | TBD | stain sensitivity |
+| Resolution | DAPI ch2 | 512 vs 1024 | yes | no | TBD | TBD | TBD | resolution effect |
+| Architecture | DAPI ch2 | 1024 | yes | no | TBD | TBD | TBD | U-Net vs dual-branch |
 
-The legacy 200-epoch panCK run belongs in this table, not Table 1. The row
-shows **val / test**; full provenance is in
-[`ABLATION_PANCK.md`](ABLATION_PANCK.md).
+The only real DAPI run so far is the legacy 512px 200-epoch model (`ch2`);
+the 1024 `ch0` run is the panCK ablation. The row shows **val / test**; full
+provenance is in [`ABLATION_PANCK.md`](ABLATION_PANCK.md) (retitled as the
+legacy DAPI baseline). 50-crop re-verification on 2026-10-23: FID 146.27,
+LPIPS 0.2468, PSNR 29.52, SSIM 0.7662, Pearson 0.5323, L1 0.0221
+(`docs/metrics_dapi_512_legacy_val50.json`).
 
 ## Table 3 — Deployment scenarios
 

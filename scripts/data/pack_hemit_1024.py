@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Build HEMIT HDF5 at native resolution with correct DAPI channel and Macenko H&E.
+"""Build HEMIT HDF5 at native resolution with the correct DAPI channel.
 
-HEMIT label TIFF channels are ch0=DAPI, ch1=CD3, ch2=panCK. This script stores
-``mihc`` (raw 3-channel) and ``dapi`` (ch0), and optionally applies Macenko
-normalization to H&E only. It streams one image at a time so it can run on the
-3.7 GB CPU box.
+The raw HEMIT mIHC label is an RGB pseudo-colour composite: **ch0=panCK (red),
+ch1=CD3 (green), ch2=DAPI (blue)**. This is confirmed by pixel morphology, the
+paper's colour convention, and the legacy 512 H5. This script stores ``mihc``
+(raw 3-channel) and ``dapi`` (ch2), and optionally applies Macenko normalization
+to H&E only. It streams one image at a time so it can run on the 3.7 GB CPU box.
 
 Usage:
   uv run --extra data python -m scripts.data.pack_hemit_1024 --splits train val test
@@ -21,8 +22,8 @@ import h5py
 import numpy as np
 import tifffile
 
-CHANNEL_ORDER = ("DAPI", "CD3", "panCK")
-DAPI_CHANNEL = 0
+CHANNEL_ORDER = ("panCK", "CD3", "DAPI")  # raw RGB storage order
+DAPI_CHANNEL = 2
 
 
 def extract_dapi(mihc: np.ndarray) -> np.ndarray:

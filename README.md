@@ -1,5 +1,13 @@
 # H&E ↔ DAPI Bidirectional Virtual Staining
 
+> **CORRECTION 2026-10-23 — HEMIT channel audit.** The raw RGB TIFF has
+> **`ch2=DAPI` (blue), `ch0=panCK` (red), `ch1=CD3` (green)**. The legacy 512
+> public weights are therefore the **real H&E→DAPI** model; the 1024 `ch0`
+> models and R-006 are panCK. ADR-014 is accepted, the 256 H5 has been rebuilt
+> on `ch2`, and the loader now prefers `mihc[...,2]`. A corrected 1024 DAPI
+> model and a valid DAPI→H&E model have **not** been trained yet. See
+> [`docs/CHANNEL_AUDIT.md`](docs/CHANNEL_AUDIT.md).
+
 [![guards](https://github.com/urbiologicalpa/he-dapi-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/urbiologicalpa/he-dapi-translator/actions)
 [![status](https://img.shields.io/badge/status-alpha-orange)](#status)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -11,19 +19,19 @@ Product scaffold for a **bidirectional H&E ↔ DAPI virtual staining tool**: one
 plugin/API/UI where a user can drop either modality and request the other, on
 patches or whole-slide images.
 
-**The bidirectional product is not available yet.** A corrected one-way
-forward baseline has been trained, but it is undertrained and internal; the
-reverse direction is still a skeleton. This repo does not claim a working
-bidirectional model until both directions have trained, evaluated weights. The
-product thesis is the unified workflow, not another one-way H&E → DAPI paper
-reproduction.
+**The bidirectional product is not available yet.** The only real DAPI model
+is the legacy 512px H&E→DAPI checkpoint; it is internal and not release quality.
+There is **no valid DAPI→H&E model** (the 1024 `ch0` reverse run is panCK→H&E).
+This repo does not claim a working bidirectional model until both directions
+have trained, evaluated weights. The product thesis is the unified workflow,
+not another one-way H&E → DAPI paper reproduction.
 
-> **Important status (2026-10-21).** A channel-order bug in the previous data
-> pipeline trained the public checkpoints on **panCK (ch2)**, not DAPI (ch0).
-> The public weights and the epoch-199/200 run are therefore an H&E → panCK
-> ablation, **not a DAPI model**. The data builder and loader are fixed, and a
-> corrected DAPI baseline now exists internally, but it is undertrained and not
-> release quality. Do not use the public weights as a DAPI solution. See
+> **Important status (2026-10-23).** The earlier correction was backwards: the
+> legacy 512 pipeline used **`ch2` = DAPI**, while the 1024 `ch0` pipeline
+> trained **panCK**. The legacy 512 public checkpoint is therefore the real
+> H&E→DAPI model (re-verify provenance before release); the 1024 `ch0`
+> checkpoints and R-006 are the panCK ablation. The 256 H5 has been rebuilt on
+> `ch2`; a corrected 1024 DAPI baseline is still pending. See
 > [Results](#results) and [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md).
 
 ## Contents
@@ -47,15 +55,16 @@ reproduction.
 | Area | State | Notes |
 |---|---|---|
 | Bidirectional plugin / one workflow | **Not available** | Direction router exists, but neither direction has release-quality weights; the product claim waits on those |
-| H&E → panCK ablation | **Complete / archived** | 200 epochs, full 630/945 evaluation; used only to validate the pipeline |
-| H&E → DAPI | **First baseline trained / internal** | 20 epochs @512 + 1k steps @1024; full 630/945 eval; undertrained, not released |
-| DAPI → H&E | **First baseline trained / internal** | 20 epochs @512 + 2×500 @1024; full 630/945 eval; undertrained, not released |
+| H&E → DAPI (legacy 512) | **Real baseline / internal** | 200 epochs, full 630/945 eval; non-paper protocol, re-verify provenance |
+| H&E → panCK ablation | **Complete / archived** | 1024 `ch0`; 20@512 + 1k@1024; full 630/945 eval; not DAPI |
+| DAPI → H&E | **Not available** | Only a panCK→H&E `ch0` baseline exists; invalid for DAPI |
+| Corrected 1024 DAPI | **Data ready, training pending** | 256 H5 rebuilt on `ch2`; no valid 1024 DAPI checkpoint yet |
 | Dual-branch Swin + FMF | **Not implemented** | `train_paired.py` currently builds the U-Net baseline |
-| Data pipeline | **Implemented** | HEMIT 5,292 pairs; corrected 1024px H5 built for train/val/test |
+| Data pipeline | **Implemented** | HEMIT 5,292 pairs; 256 H5 rebuilt on `dapi=mihc[...,2]`; loader prefers `mihc[...,2]` |
 | Patch inference | **Implemented** | PyTorch + tiled 512px inference on CPU |
 | WSI inference | **Experimental** | Tiled/streaming path exists; not validated at scale |
 | Backend / frontend | **Alpha** | FastAPI + React drag-and-drop UI; Docker staging build |
-| PyPI packages | **Alpha** | `he-dapi` / `napari-he-dapi`; current weights are the panCK ablation |
+| PyPI packages | **Alpha** | `he-dapi` / `napari-he-dapi`; legacy 512 DAPI weights, provenance re-verification pending |
 
 Hardware context:
 
@@ -99,7 +108,7 @@ direction, and only then expose both directions as one bidirectional plugin.
 ### Data and inference
 
 - Streaming HDF5 builders that avoid loading the full dataset into RAM.
-- Correct HEMIT channel handling: **ch0 = DAPI, ch1 = CD3, ch2 = panCK**.
+- Correct HEMIT channel handling: **ch0 = panCK, ch1 = CD3, ch2 = DAPI**.
 - Optional Macenko H&E normalization at pack time.
 - 512px tiled inference with overlap averaging, plus an experimental streaming
   WSI path.
@@ -133,13 +142,14 @@ HEMIT label TIFFs are 3-channel mIHC:
 
 | Channel | Marker |
 |---|---|
-| `ch0` | **DAPI** |
-| `ch1` | CD3 |
-| `ch2` | panCK |
+| `ch0` | **panCK** (red) |
+| `ch1` | CD3 (green) |
+| `ch2` | **DAPI** (blue) |
 
-**Known data pitfall:** the old 512px H5 files (`data/processed/hemit_*_512.h5`)
-were built with `ch2` as the target. They are the source of the panCK ablation
-and must not be used for DAPI training or evaluation.
+**Corrected data:** the 256px H5 files (`data/processed/hemit_*_256.h5`) were
+rebuilt on 2026-10-23 with `dapi = mihc[...,2]` and `dapi_channel=2`. The 1024
+H5 `dapi` cache is still `ch0`, but the loader deliberately reads
+`mihc[...,2]` and ignores that cache. Do not use a `ch0` cache as DAPI.
 
 Build the corrected native-resolution dataset:
 
@@ -210,13 +220,14 @@ he-dapi info
 he-dapi translate -i he.png -o out.png -d he2dapi
 ```
 
-> The published `he-dapi` package currently resolves to the **panCK ablation**
-> checkpoint. Treat its output as an H&E → mIHC-channel demo, not DAPI. The
-> package will be re-released with corrected DAPI weights.
+> The published `he-dapi` package resolves to the legacy 512 H&E→DAPI
+> checkpoint. Its provenance is being re-verified; until then, treat it as an
+> internal research model, not a validated DAPI product. The package will be
+> re-released with a re-verified checkpoint and a corrected model card.
 
 ## Training
 
-### Current CPU baseline (panCK ablation only)
+### Legacy CPU baseline (real DAPI target)
 
 ```bash
 PYTHONPATH=. python -m src.models.train_paired \
@@ -224,8 +235,9 @@ PYTHONPATH=. python -m src.models.train_paired \
   --resume auto --optimize-for lowram
 ```
 
-This is a 512px, batch-2, grad-accum-4 CPU configuration. It is useful as an
-engineering baseline but it is **not** the DAPI experiment.
+This is the 512px, batch-2, grad-accum-4 legacy configuration. It reads
+`mihc[...,2]` (DAPI) and produced the 200-epoch legacy DAPI checkpoint. The
+1024 `ch0` U-Net run is the panCK ablation, not the DAPI experiment.
 
 ### Corrected DAPI baseline (done, undertrained)
 
@@ -265,23 +277,24 @@ PYTHONPATH=. python src/models/infer.py \
   --out /tmp/wsi_synthetic.tiff
 ```
 
-Current checkpoints are the panCK ablation. Corrected DAPI inference commands
-will be published with the first validated DAPI checkpoint.
+The current H&E→DAPI checkpoint is the legacy 512 model. There is no valid
+DAPI→H&E checkpoint; corrected DAPI→H&E inference commands will be published
+after a `ch2` retrain.
 
 ## Results
 
-### DAPI target: first corrected baseline
+### DAPI target: legacy 512 baseline
 
-The first corrected DAPI baseline is trained but undertrained. Full 630 val /
-945 test:
+The only real DAPI model is the legacy 512px 200-epoch run (`ch2`). Full 630
+val / 945 test:
 
-| Split | n | SSIM | Pearson | PSNR (dB) | Dice |
-|---|---:|---:|---:|---:|---:|
-| val | 630 | 0.670 | 0.255 | 28.77 | 0.104 |
-| test | 945 | 0.725 | 0.611 | 26.60 | 0.449 |
+| Split | n | SSIM | Pearson | PSNR (dB) |
+|---|---:|---:|---:|---:|
+| val | 630 | 0.739 | 0.507 | 29.23 |
+| test | 945 | 0.789 | 0.878 | 30.65 |
 
-Do not treat this as release quality; the val/test gap is large and the model
-has only 1,000 fine-tune steps at 1024.
+This is non-paper protocol and provenance is being re-verified. Do not treat it
+as release quality.
 
 Reference numbers from the HEMIT paper (DAPI column, for orientation only):
 
@@ -297,11 +310,11 @@ comparison protocol and table templates are in
 
 ### panCK ablation (do not read as DAPI)
 
-The local CPU run optimized `mihc[..., 2]` (panCK). Its checkpoints,
-`docs/metrics_eval.json`, and the current demo/package weights belong to this
-ablation. Full 630 val / 945 test PSNR is 29.23 / 30.65 dB; that number is not
-comparable to the DAPI table above and is not a claim of DAPI quality. See
-[`docs/RESULTS.md`](docs/RESULTS.md) for the full explanation.
+The 1024 `ch0` run optimized panCK. Its checkpoints and R-006 belong to this
+ablation. Full 630 val / 945 test SSIM is 0.670 / 0.725 (forward) and
+0.437 / 0.593 (reverse); those numbers are not DAPI quality. See
+[`docs/RESULTS.md`](docs/RESULTS.md) and
+[`docs/ABLATION_PANCK.md`](docs/ABLATION_PANCK.md).
 
 ## Repository layout
 
@@ -330,16 +343,16 @@ Generated artifacts are git-ignored:
 ## Roadmap
 
 - [x] Stream HEMIT into resumable HDF5 without OOM on a 3.7 GB box.
-- [x] Identify and fix the DAPI channel-order bug (`ch0`, not `ch2`).
+- [x] Identify and fix the DAPI channel-order bug (`ch2`, not `ch0`).
 - [x] Add channel-order regression tests and a corrected 1024px builder.
 - [x] Confirm Kaggle T4 availability and the free GPU quota path.
 - [x] Archive the panCK ablation and record full 630/945 benchmark numbers.
-- [x] Build and verify corrected 1024px HEMIT HDF5.
-- [x] Train corrected U-Net H&E → DAPI baseline on 1024px data.
+- [x] Build and verify 256px HEMIT HDF5 on `dapi=mihc[...,2]`.
+- [ ] Train a corrected U-Net H&E → DAPI baseline on `ch2` data.
 - [x] Run the full 630-image validation and 945-image held-out test evaluation.
 - [ ] Implement/vendor the dual-branch Swin-T + FMF generator.
-- [x] Train paired DAPI → H&E baseline; full 630/945 eval.
-- [ ] Run the fair HEMIT-domain CycleGAN comparison (corrected 256 kernel).
+- [x] Train panCK → H&E `ch0` ablation; full 630/945 eval.
+- [ ] Run a valid DAPI → H&E comparison on the rebuilt `ch2` 256 H5.
 - [x] Add a direction router so one plugin/API accepts either modality.
 - [x] Benchmark 512px tiled / ONNX/INT8 CPU inference (`docs/BENCHMARK.md`).
 - [ ] Ship **bidirectional v1** only after both directions have trained, evaluated
@@ -401,7 +414,7 @@ system.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
 Good first issues are labeled on GitHub. Please do not open PRs that present the
-panCK ablation as a DAPI result.
+panCK/`ch0` ablation as a DAPI result.
 
 ## Author
 

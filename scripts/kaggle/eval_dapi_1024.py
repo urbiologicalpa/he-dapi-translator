@@ -89,7 +89,7 @@ def main() -> None:
             sys.executable, "-u", "-m", "src.models.eval_offline",
             "--checkpoint", str(ckpt), "--h5", str(h5), "--split", split,
             "--num", str(num), "--patch-size", "1024",
-            "--target", "DAPI ch0" if DIRECTION == "he2dapi" else "H&E RGB",
+            "--target", "DAPI ch2" if DIRECTION == "he2dapi" else "H&E RGB",
             "--label", f"{TAG}-1024-unet",
             "--direction", DIRECTION,
             "--out", str(out),

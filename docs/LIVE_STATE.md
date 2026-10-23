@@ -1,4 +1,4 @@
-# LIVE STATE — 2026-10-22 17:21 UTC
+# LIVE STATE — 2026-10-23 04:45 UTC
 
 > **Canonical strategy/decisions: [`docs/PLAN.md`](PLAN.md) v2.0.**
 > **Read this file first after any WSL crash, reboot, or "what is running?" question.**
@@ -10,51 +10,116 @@
 
 ---
 
+## 0. BLOCKER — HEMIT channel audit (2026-10-23)
+
+**All DAPI claims and runs are frozen.** The raw HEMIT RGB TIFF has
+**`ch2=DAPI` (blue), `ch0=panCK` (red), `ch1=CD3` (green)**. ADR-001 is reversed
+by accepted ADR-014. The legacy 512 model is the real DAPI model; the 1024 `ch0`
+forward/reverse models and R-006 are panCK. See
+[`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md). **The ch2 H5 rebuild is verified; do not
+launch any DAPI run from a `ch0` cache.**
+
+### 0.1 Data correction (completed 2026-10-23 04:35 UTC)
+
+- **Job:** rebuild 256px H5 with `dapi = mihc[...,2]` (DAPI blue), sequential
+  val → test → train. Old wrong files renamed `*_256_ch0_invalid.h5`.
+- **Command:**
+  ```bash
+  for s in val test train; do
+    PYTHONPATH=. .venv/bin/python -m scripts.data.crop_hemit_h5 \
+      --src data/processed/hemit_${s}_1024.h5 \
+      --out data/processed/hemit_${s}_256.h5 \
+      --size 256 --compression lzf
+  done
+  ```
+- **PID:** `13311`; **log:** `logs/rebuild_256_ch2.log`.
+- **Expected:** `hemit_{val,test,train}_256.h5` with attrs
+  `dapi_channel=2`, `channel_order=panCK,CD3,DAPI`; sizes ~104MB / 148MB /
+  596MB. Streaming, <2GB RAM.
+- **Result:** DONE 04:35:46 UTC, exit 0. Verified val/test/train `dapi` is
+  byte-identical to the center crop of `mihc[...,2]` (indices 0/17/629 on val),
+  attrs `dapi_channel=2`; sizes 102MB/152MB/596MB. Old ch0 derivatives are
+  preserved as `*_256_ch0_invalid.h5`.
+- **Loader:** `PairedHEMITDataset` and `UnpairedDataset` now prefer
+  `mihc[...,2]`, so the wrong 1024 `dapi` cache is ignored. Full suite:
+  51 passed, 1 skipped.
+- **Legacy re-verification:** 50-crop val on the legacy 512 checkpoint
+  (SHA-256 `6789d7d2…4042aa`) gives FID 146.27, LPIPS 0.2468, PSNR 29.52,
+  SSIM 0.7662, Pearson 0.5323, L1 0.0221; saved to
+  `docs/metrics_dapi_512_legacy_val50.json`. This confirms it predicts DAPI.
+- **Next:** decide whether to spend the remaining Kaggle quota (~6h) on a
+  corrected `ch2` reverse run.
+
+---
+
+## 0.2 Active corrected run — paired ch2 1024, both directions (launched 2026-10-23 04:54 UTC)
+
+- **Kernel:** `bikasash/he-dapi-paired-ch2-1024-both` v1
+  (`/tmp/kaggle_kernel_paired_ch2_1024/`), GPU T4, private.
+- **Push command:**
+  ```bash
+  KAGGLE_API_TOKEN="$(cat ~/.kaggle/api_token)" \
+    .venv/bin/kaggle kernels push -p /tmp/kaggle_kernel_paired_ch2_1024
+  ```
+- **Data:** `bikasash/hemit-dapi-1024-ch0-macenko` (historical name; `mihc`
+  intact, loader reads `mihc[...,2]`) + `bikasash/he-dapi-code-dapi-1024`
+  v2026-10-23 04:53 (ADR-014 loader/both runner).
+- **Plan:** `DAPI_DIRECTION=both`, `DAPI_STAGE=all`,
+  `DAPI_PRETRAIN_EPOCHS=14`, `DAPI_FINETUNE_EPOCHS=2`,
+  `DAPI_FINETUNE_STEPS=500`. Forward then reverse.
+- **Outputs (kernel):** `/kaggle/working/checkpoints/dapi_{pretrain,finetune}/`,
+  `/kaggle/working/checkpoints/dapi2he_{pretrain,finetune}/`.
+- **Expected:** ~4–5 h; quota was **6.18 h remaining** at 04:45 UTC.
+- **Stop rule:** if either direction exceeds ~2.4 h before fine-tune, cancel and
+  keep the partial checkpoint; do not exhaust quota without a result.
+- **Resume:** re-push the same kernel; `--resume auto` continues from the
+  highest checkpoint if the output is reattached.
+- **Local monitor:** PID `15902`, log `logs/kaggle_ch2_monitor.log`; pulls output to
+  `/tmp/klog_ch2` on exit.
+- **Verification after exit:** pull logs, confirm H5-only, `mihc[...,2]`, CUDA,
+  and no `ch0` target; then evaluate full val/test.
+
+---
+
 ## 1. Current stage
 
-| Item | State (verified 2026-10-22 17:21 UTC) |
+| Item | State (verified 2026-10-23 04:45 UTC) |
 |---|---|
 | Roadmap phase | **Phase 2 — Modeling** |
-| Sub-stage | **2.3 HEMIT-domain CycleGAN (DAPI→H&E) fair comparison** |
-| Primary compute | Kaggle T4, corrected kernel `bikasash/he-dapi-cyclegan-hemit-dapi2he-256` |
-| Primary run status | `RUNNING` (v3, pushed 17:20 UTC; GPU quota confirms consumption) |
-| **Primary run validity** | Corrected v3 is valid by construction; verify its log when it exits. The 14:25 kernel is **CANCEL_ACKNOWLEDGED / INVALID** (§4) |
+| Sub-stage | **Stage 2.4 reverse selection blocked; data corrected, legacy DAPI verified; `ch2` retrain pending** |
+| Primary compute | **Kaggle T4 — paired ch2 1024 both directions (running)** |
+| Primary run status | R-006 `COMPLETE` at 18:55 UTC on 2026-10-22; output pulled |
+| **Primary run validity** | **INVALID for DAPI** — trained on `ch0` (panCK), not DAPI. Do not use FID 367.97 / LPIPS 0.5948 / SSIM 0.2216 as DAPI. The 14:25 kernel remains **CANCEL_ACKNOWLEDGED / INVALID** |
 | Local CPU run | **STOPPED** at ~step 50; WSL protected (see §3) |
-| Next stage | Wait for v3; pull output, evaluate, then write the reverse selection memo |
+| Next stage | Await both-direction ch2 run; evaluate full val/test; no `ch0` reuse |
 
-**The corrected v3 kernel is RUNNING on the T4; do not push another GPU run.**
+**Frozen: no DAPI claims, no DAPI training, no model promotion.**
 **Do not restart the local CPU run while swap free is below ~300MB.**
 
 ---
 
-## 2. What is running / not running now (verified 17:21 UTC)
+## 2. What is running / not running now (verified 2026-10-23 02:49 UTC)
 
-### Running
-- **Kaggle (corrected, v3):** `bikasash/he-dapi-cyclegan-hemit-dapi2he-256`
-  - Pushed 2026-10-22 17:20 UTC; status `RUNNING`.
-  - GPU quota moved 22.26h → 22.28h used, confirming a real GPU session.
-  - Code dataset `bikasash/he-dapi-code-hemit-256` READY.
-  - v1/v2 were 6-second no-ops (missing `if __name__ == "__main__"` in the
-    wrapper); fixed before v3. Live logs are not exposed by the old API.
-  - Expected output: `/kaggle/working/checkpoints/hemit_cyclegan_dapi2he_256/`,
-    `cyclegan_G_last.pt`, `checkpoint_last.pt`, `eval_cyclegan.json`.
-  - Status monitor: PID `7254`, log `logs/kaggle_256_monitor.log`
-    (`scripts/watch_kaggle_256.sh`, 120s interval, exits on terminal status).
-  - Prepared while waiting: `docs/selection_reverse.md` (Stage 2.4 template)
-    and `scripts/kaggle/pull_hemit_256.sh` (pull + SHA-256 + eval JSON).
-  - Provenance verified 17:42 UTC: the mounted code dataset contains
-    `src/models/datasets.py` SHA-256 `4b74f294…` (identical to the local fixed
-    file), the H5-authoritative marker, and the Kaggle config
-    (`batch4 × accum2`, AMP on). No `data/` in the code dataset.
+### Completed — invalid for DAPI
+- **Kaggle R-006:** `bikasash/he-dapi-cyclegan-hemit-dapi2he-256`
+  - Status `COMPLETE` at 2026-10-22 18:55 UTC; 10 epochs, 929 steps/epoch,
+    AMP, ~414s/epoch; exit 0.
+  - Logs: `logs/kaggle_256_final.log`, `logs/kaggle_256_stdout.log`.
+  - Output pulled: `cyclegan_G_last.pt` (45.5MB) and
+    `eval_cyclegan.json` to `/tmp/k256_eval/`.
+  - Training log verified H5-only: `HE: 0 files + H5 …`, `synthetic=False`,
+    `device cuda`, `[AMP] mixed precision fp16`.
+  - **Target is panCK (`ch0`), not DAPI.** Local 50-crop eval:
+    FID 367.97, LPIPS 0.5948, PSNR 11.37, SSIM 0.2216, Pearson 0.1596.
+    Do not use these as DAPI metrics. See [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md).
+  - Qualitative grid: `docs/qualitative_dapi2he/hemit_val_compare.png`
+    (DAPI column is `ch0`/panCK; the CycleGAN output is generic nuclei).
 
 ### Cancelled
 - **Kaggle (invalid):** `bikasash/he-dapi-cyclegan-hemit-dapi2he-1024`
   - Status `CANCEL_ACKNOWLEDGED` (confirmed 17:19 UTC). Earlier `RUNNING`
     readings were API lag; the user's UI check was correct.
   - Its metrics must not be used; see §4.
-  - Will crop `hemit_{train,val}_1024.h5` to 256 in-kernel, train 10 epochs,
-    then eval on `hemit_val_256.h5`.
-  - URL: <https://www.kaggle.com/code/bikasash/he-dapi-cyclegan-hemit-dapi2he-256>
 
 ### Not running
 - Local `train_unpaired` / `train_unpaired_safe.sh`: **none** (`pgrep` empty).
@@ -147,7 +212,9 @@ Local artifacts:
 - `data/processed/hemit_train_256.h5` — 596MB, 3,717 pairs (built 15:07 UTC)
 - `data/processed/hemit_val_256.h5` — 104MB, 630 pairs (15:08 UTC)
 - `data/processed/hemit_test_256.h5` — 148MB, 945 pairs (15:08 UTC)
-- Labels: `ch0=DAPI`, `ch1=CD3`, `ch2=panCK`.
+- Labels (historical, **WRONG** — do not use): the 1024 H5 `dapi` is `ch0`,
+  which the 2026-10-23 audit identifies as panCK. Correct mapping is
+  `ch2=DAPI`, `ch0=panCK`, `ch1=CD3`. See `docs/CHANNEL_AUDIT.md`.
 
 ---
 

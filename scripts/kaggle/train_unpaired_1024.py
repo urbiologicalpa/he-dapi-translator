@@ -2,7 +2,7 @@
 """Kaggle T4 runner for unpaired DAPI -> H&E CycleGAN.
 
 Attach:
-  bikasash/hemit-dapi-1024-ch0-macenko  (DAPI domain, train split)
+  bikasash/hemit-dapi-1024-ch0-macenko  (DAPI domain; loader reads mihc[...,2])
   bikasash/mhist-he-512                 (external H&E domain)
   bikasash/he-dapi-code-dapi-1024       (code bundle)
 

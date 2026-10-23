@@ -1,4 +1,4 @@
-# Corrected H&E -> DAPI (ch0) pretraining at 512px.
+# Corrected H&E -> DAPI (ch2, blue) pretraining at 512px.
 # Uses the 1024px Macenko HDF5 and center-crops to 512.
 data:
   name: hemit

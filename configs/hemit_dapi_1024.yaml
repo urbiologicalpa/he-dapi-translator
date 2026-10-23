@@ -1,4 +1,4 @@
-# Corrected H&E -> DAPI (ch0) fine-tuning at native 1024px.
+# Corrected H&E -> DAPI (ch2, blue) fine-tuning at native 1024px.
 # Initialize from the 512px DAPI checkpoint, then fine-tune at 1024.
 data:
   name: hemit

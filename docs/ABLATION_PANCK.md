@@ -1,6 +1,14 @@
-# H&E → panCK ablation — 200 epochs, 512px
+# Legacy H&E → DAPI baseline — 200 epochs, 512px
 
-**Status: internal benchmark artifact. Not a DAPI model. Not a product release.**
+> **CORRECTION 2026-10-23: this is the real H&E→DAPI model, not panCK.**
+> The legacy 512 H5 stores `dapi = mihc[...,2]`, which the channel audit
+> identifies as DAPI (blue). This 512px model is the **real DAPI baseline**. The
+> 1024 `ch0` model is the panCK ablation.
+> Do not delete this run; it has been relabeled under ADR-014. See
+> [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md).
+
+**Status: internal benchmark artifact. The title/filename are historical and
+will be corrected. Not a product release.**
 
 This run exists to validate the pipeline, resumability, and evaluation path. It
 must not be presented as H&E → DAPI.

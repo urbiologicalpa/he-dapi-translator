@@ -203,7 +203,7 @@ def main():
     ap.add_argument("--save", action="store_true", help="append to docs/metrics_eval.json")
     ap.add_argument("--out", type=str, default=None, help="write a single labeled result JSON to this path")
     ap.add_argument("--label", type=str, default=None, help="experiment label, e.g. panck-ch2-ablation")
-    ap.add_argument("--target", type=str, default=None, help="target definition, e.g. 'DAPI ch0' or 'panCK ch2'")
+    ap.add_argument("--target", type=str, default=None, help="target definition, e.g. 'DAPI ch2' or 'panCK ch0'")
     ap.add_argument("--h5", type=str, default=None, help="override HDF5 path")
     ap.add_argument("--patch-size", type=int, default=512)
     ap.add_argument("--ngf", type=int, default=64)

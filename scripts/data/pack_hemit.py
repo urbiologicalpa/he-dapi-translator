@@ -56,7 +56,7 @@ for split in ["train","val","test"]:
     n=len(pairs)
     with h5py.File(tmp,"w") as f:
         f.create_dataset("he", (n,patch,patch,3), dtype="uint8", chunks=(1,patch,patch,3), compression="lzf")
-        # label is RGB 3ch mIHC. HEMIT channel order: ch0=DAPI, ch1=CD3, ch2=panCK.
+        # label is RGB 3ch mIHC. Storage: ch0=panCK (red), ch1=CD3 (green), ch2=DAPI (blue).
         f.create_dataset("mihc", (n,patch,patch,3), dtype="uint8", chunks=(1,patch,patch,3), compression="lzf")
         f.create_dataset("dapi", (n,patch,patch), dtype="uint8", chunks=(1,patch,patch), compression="lzf")
         for i,(he_p, lab_p) in enumerate(pairs):
@@ -66,9 +66,9 @@ for split in ["train","val","test"]:
             if he.shape[0]!=patch:
                 he = central_crop(he, patch)
                 mihc = central_crop(mihc, patch)
-            # DAPI is ch0 (confirmed by HEMIT-DATASET and official post_process.py:
-            # ch0->blue DAPI, ch1->green CD3, ch2->red panCK).
-            dapi = mihc[:,:,0] if mihc.ndim==3 else mihc
+            # DAPI is the blue channel (ch2). The old comment claiming ch0
+            # was wrong; see docs/CHANNEL_AUDIT.md.
+            dapi = mihc[:,:,2] if mihc.ndim==3 else mihc
             f["he"][i]=he
             f["mihc"][i]=mihc
             f["dapi"][i]=dapi
@@ -86,7 +86,7 @@ for split in ["train","val","test"]:
         f.attrs["num_pairs"]=n
         f.attrs["source"]="HEMIT"
         f.attrs["channel_order"]="DAPI,CD3,panCK"
-        f.attrs["dapi_channel"]=0
+        f.attrs["dapi_channel"]=2
     os.replace(tmp, out)
     _check(f"pack_hemit:{split}:end")
     print(f"[OK] {out} {os.path.getsize(out)/1e6:.1f} MB")
@@ -138,7 +138,7 @@ for patch in [512]:
         fout.attrs["num_pairs"]=total
         fout.attrs["source"]="HEMIT"
         fout.attrs["channel_order"]="DAPI,CD3,panCK"
-        fout.attrs["dapi_channel"]=0
+        fout.attrs["dapi_channel"]=2
     os.replace(tmp,out)
     _check("pack_hemit:combined:end")
     print(f"[OK combined] {out} {total} (streaming, peak < 150MB vs 10GB before)")

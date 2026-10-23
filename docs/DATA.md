@@ -31,22 +31,24 @@ data/raw/hemit/extracted/
 
 ## Channel order (critical)
 
-HEMIT label TIFF channels are:
+HEMIT label TIFFs are RGB pseudo-colour composites, not three independent
+grayscale marker planes:
 
 | Channel | Marker | Use |
 |---|---|---|
-| `ch0` | **DAPI** | H&E → DAPI target |
-| `ch1` | CD3 | optional auxiliary target |
-| `ch2` | panCK | optional auxiliary target |
+| `ch0` | **panCK** (red) | ablation target |
+| `ch1` | CD3 (green) | not modelled |
+| `ch2` | **DAPI** (blue) | H&E → DAPI target |
 
-This was confirmed against the official `post_process.py` /
-`tif_composite` mapping (ch0 → blue/DAPI, ch1 → green/CD3, ch2 → red/panCK).
+Evidence: nuclei morphology, correlation with H&E nuclei (ch2 0.578 vs ch0
+0.296), the legacy 512 H5 (`dapi == mihc[...,2]`), and the HEMIT paper's colour
+convention. The official `post_process.py` comment (`ch0 #dapi`) is inconsistent
+with the raw pixels. See [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md).
 
-> **Legacy bug.** The first 512px H5 files were built with `ch2` as the target.
-> They are **panCK data**, not DAPI. Do not train or evaluate a DAPI model on
-> `data/processed/hemit_*_512.h5`. The bug is fixed in
-> `src/models/datasets.py` and `scripts/data/pack_hemit.py`; new work should use
-> the corrected 1024px builder.
+> **Prior bug (corrected).** The 1024/256 H5 `dapi` caches were built from
+> `ch0` (panCK); the 256 H5 was rebuilt on 2026-10-23 from `mihc[...,2]`. The
+> loader now prefers `mihc[...,2]`, so the wrong 1024 cache is ignored. The old
+> 512 H5 used `ch2` and is DAPI data; it is not panCK.
 
 ## Build corrected data
 

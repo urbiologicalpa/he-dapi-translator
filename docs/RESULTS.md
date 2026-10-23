@@ -1,16 +1,22 @@
 # Results
 
+> **CHANNEL AUDIT — 2026-10-23: corrected labels below.**
+> The raw HEMIT RGB TIFF has **ch2=DAPI (blue), ch0=panCK (red), ch1=CD3
+> (green)**. The legacy 512 model is the **real DAPI** model; the 1024 `ch0`
+> forward/reverse models and R-006 are **panCK**. The 256 H5 was rebuilt on
+> `ch2`; a corrected 1024 DAPI model is still pending. See
+> [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md). Do not use R-006 as DAPI.
+
 ## TL;DR
 
-- A corrected **H&E → DAPI baseline now exists**, but it is undertrained and
-  below the paper reference. Its val/test gap is large; do not over-read it.
-- The epoch-199/200 CPU run and all current demo/package weights are an
-  **H&E → panCK ablation** caused by using label channel `ch2` instead of
-  `ch0` (DAPI).
-- The panCK ablation now has full **630 val + 945 test** metrics; they are
-  engineering baselines, not DAPI results.
-- Corrected 1024px HEMIT HDF5 is built and verified. The DAPI baseline has now
-  been trained on a Kaggle T4 (20 epochs at 512 + 1,000 steps at 1024).
+- The only real **H&E → DAPI** baseline is the legacy 512px 200-epoch model
+  (`ch2`); it is internal, non-paper protocol, and its provenance is being
+  re-verified.
+- The epoch-199/200 checkpoints and the 1024 `ch0` run are the **panCK
+  ablation**; R-006 is also panCK. They are engineering baselines, not DAPI.
+- The 256 H5 was rebuilt on `mihc[...,2]` on 2026-10-23 and verified; the
+  loader ignores the stale 1024 `dapi` cache.
+- No valid 1024 DAPI model and no valid DAPI→H&E model exist yet.
 - Paper targets are listed below for orientation; they are **not** results from
   this repository.
 
@@ -19,24 +25,26 @@
 HEMIT label TIFFs are ordered:
 
 ```
-ch0 = DAPI
-ch1 = CD3
-ch2 = panCK
+ch0 = panCK (red)
+ch1 = CD3   (green)
+ch2 = DAPI  (blue)
 ```
 
-The original 512px builder stored `mihc[..., 2]` as the target. The model
-therefore learned H&E → panCK. The public checkpoint, `docs/metrics_eval.json`,
-the Hugging Face weights, and the demo output all belong to that ablation.
+The legacy 512 builder stored `mihc[..., 2]`, so that model learned H&E → DAPI.
+The later 1024/256 builders stored `ch0`, so those models and R-006 learned
+H&E → panCK. The legacy 512 checkpoint/metrics are therefore the real DAPI
+baseline; the 1024 `ch0` metrics are the panCK ablation.
 
-The bug is fixed in:
+The correction is implemented in:
 
-- `scripts/data/pack_hemit.py` (legacy 512 builder)
-- `scripts/data/pack_hemit_1024.py` (correct 1024 builder)
-- `src/models/datasets.py` (`mihc[..., 0]` fallback)
+- `scripts/data/pack_hemit.py` (legacy 512 builder; `ch2`)
+- `scripts/data/pack_hemit_1024.py` (`DAPI_CHANNEL = 2`)
+- `scripts/data/crop_hemit_h5.py` (256 rebuild from `mihc[...,2]`)
+- `src/models/datasets.py` (loader prefers `mihc[...,2]`)
 - `tests/test_hemit_channels.py` (regression tests)
 
-The old metrics remain in the repository only as an engineering baseline. They
-must not be reported as DAPI performance.
+The 1024 `ch0` metrics remain only as an engineering ablation. They must not be
+reported as DAPI performance.
 
 ## Paper reference (HEMIT, DAPI column)
 
@@ -61,16 +69,31 @@ Protocol notes from the paper/reference implementation:
 
 | Run | Target | Status | Metrics |
 |---|---|---|---|
-| Local CPU, 200 epochs, 512px | panCK (`ch2`) | Ablation, retained | Full 630 val / 945 test: SSIM 0.739 / 0.789, Pearson 0.507 / 0.878, PSNR 29.23 / 30.65 dB; not DAPI |
-| Corrected 1024px U-Net | DAPI (`ch0`) | First baseline, undertrained | Full 630 val / 945 test: SSIM 0.670 / 0.725, Pearson 0.255 / 0.611, PSNR 28.77 / 26.60 dB, Dice 0.104 / 0.449 |
-| Corrected dual-branch | DAPI (`ch0`) | Not implemented | — |
-| Reverse DAPI → H&E | H&E | First baseline, undertrained | 20 epochs @512 + 2×500 @1024; full 630/945 eval; not released |
+| Legacy CPU, 200 epochs, 512px | DAPI (`ch2`) | Real DAPI baseline | Full 630 val / 945 test: SSIM 0.739 / 0.789, Pearson 0.507 / 0.878, PSNR 29.23 / 30.65 dB |
+| 1024px U-Net, `ch0` | panCK (`ch0`) | panCK ablation; not DAPI | Full 630 val / 945 test: SSIM 0.670 / 0.725, Pearson 0.255 / 0.611, PSNR 28.77 / 26.60 dB, Dice 0.104 / 0.449 |
+| Corrected dual-branch | DAPI (`ch2`) | Not implemented | — |
+| Reverse 1024, `ch0` | H&E from panCK | panCK→H&E ablation; not DAPI | 20 epochs @512 + 2×500 @1024; full 630/945 eval; not released |
 
-## First corrected DAPI baseline
+## Legacy 512 DAPI re-verification (2026-10-23)
+
+Checkpoint `resources/models/checkpoints/he2dapi/checkpoint_epoch200.pt`
+(SHA-256 `6789d7d244cc6ac93dffd98a30ed2c17498aa7ee6081560dedac5173b44042aa`)
+was re-evaluated with the corrected loader (which reads `mihc[...,2]`) on the
+legacy 512 val H5, 50 center crops:
+
+| n | FID ↓ | LPIPS ↓ | PSNR | SSIM | Pearson | L1 |
+|---:|---:|---:|---:|---:|---:|---:|
+| 50 | 146.27 | 0.2468 | 29.52 | 0.7662 | 0.5323 | 0.0221 |
+
+This strongly supports the audit: the legacy 512 model predicts nuclei/DAPI,
+not panCK. The full 630/945 numbers in the table above came from the same
+`ch2` target. Provenance is now recorded; re-run full splits before release.
+
+## First 1024 baseline (panCK target — invalid for DAPI)
 
 Run: Kaggle T4, 20 epochs at 512 (3,717 pairs) then 2×500 steps at 1024.
 Checkpoint: `resources/models/checkpoints/he2dapi_dapi_1024/checkpoint_last.pt`
-(SHA-256 `871560a1…b4103d`). Target: DAPI `ch0`. No Macenko.
+(SHA-256 `871560a1…b4103d`). Target: panCK `ch0` — **not DAPI**. No Macenko.
 
 | Split | n | SSIM | Pearson | PSNR | Dice |
 |---|---:|---:|---:|---:|---:|
@@ -99,8 +122,8 @@ FID + LPIPS (50 val crops, 512px, Inception pool3 / AlexNet):
 
 | Run | Target | val FID ↓ | val LPIPS ↓ | PSNR | SSIM |
 |---|---|---:|---:|---:|---:|
-| Forward 1024 baseline | DAPI ch0 | 77.14 | 0.1407 | 33.88 | 0.728 |
-| Reverse 1024 baseline | H&E | 313.18 | 0.6051 | 13.25 | 0.496 |
+| Forward 1024 baseline | panCK ch0 (invalid for DAPI) | 77.14 | 0.1407 | 33.88 | 0.728 |
+| Reverse 1024 baseline | H&E from panCK ch0 (invalid for DAPI) | 313.18 | 0.6051 | 13.25 | 0.496 |
 
 The reverse FID/LPIPS are far worse than forward, consistent with the low
 output contrast (fake std ≈ 0.09 vs real ≈ 0.18). JSON:
@@ -164,6 +187,24 @@ This is **not** paper-level: paper U-Net is SSIM 0.791 / Pearson 0.659.
 The val/test gap is large and likely reflects slide/domain differences plus
 limited fine-tuning. It is a plumbing baseline, not a claim of DAPI quality.
 
+## R-006 — HEMIT 256px CycleGAN (panCK `ch0`; invalid for DAPI)
+
+Run: `bikasash/he-dapi-cyclegan-hemit-dapi2he-256`, 10 epochs, 929
+steps/epoch, batch 4 × accum 2, AMP, HEMIT `hemit_{train,val}_256.h5` only
+(`HE: 0 files + H5`, `synthetic=False`), exit 0 at 2026-10-22 18:55 UTC.
+
+Local 50-crop val evaluation (same first 50 crops as the paired baseline):
+
+| Model | Target | FID ↓ | LPIPS ↓ | PSNR | SSIM | L1 ↓ | Pearson |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Paired reverse 1024 @256 | H&E | 342.98 | 0.5904 | 13.17 | 0.4941 | 0.2056 | 0.4856 |
+| CycleGAN HEMIT 256 | H&E | 367.97 | 0.5948 | 11.37 | 0.2216 | 0.2292 | 0.1596 |
+
+**Both models were trained on `ch0`, which is panCK, not DAPI.** This table is
+therefore a panCK→H&E comparison, not the reverse DAPI comparison. Do not use
+it to select the DAPI architecture. The full 630-crop JSON (no FID/LPIPS) is
+L1 0.2543, PSNR 10.61, SSIM 0.2051, Pearson 0.1537.
+
 ## Evaluation protocol
 
 The baseline used the official split:
@@ -175,6 +216,11 @@ The baseline used the official split:
   metrics JSON.
 - Keep per-image outputs or hashes so the numbers can be audited.
 
-Do not compare a 512px panCK ablation to 1024px DAPI paper numbers. They differ
-in target, resolution, and evaluation set. Full ablation provenance is in
-[`ABLATION_PANCK.md`](ABLATION_PANCK.md).
+**Correction (2026-10-23):** the legacy 512 model is **DAPI (`ch2`)**, and the
+1024 `ch0` model is the panCK ablation. The paragraphs above that say otherwise
+are frozen pending the ADR-014 rewrite. The legacy 512 DAPI model's full-split
+metrics are val SSIM 0.7389 / Pearson 0.5072 and test SSIM 0.7890 / Pearson
+0.8781; these are the numbers closest to the paper's DAPI target. See
+[`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md) and
+[`ABLATION_PANCK.md`](ABLATION_PANCK.md) (the latter title is now misleading;
+it documents the real DAPI run and will be renamed after approval).

@@ -37,3 +37,4 @@ private/
 
 # Qualitative audit: keep contact sheet + summary, not every full-res sample
 docs/qualitative_dapi2he/val_*.png
+logs/*.out
