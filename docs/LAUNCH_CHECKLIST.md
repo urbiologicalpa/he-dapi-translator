@@ -1,11 +1,14 @@
-# Launch Checklist — v1.0 (H&E ↔ DAPI Virtual Staining)
+# Launch Checklist — v0.2.0 (H&E ↔ DAPI Virtual Staining)
 
-> **Superseded status (2026-10-20):** the checkpoint produced by the previous
-> run is **H&E → panCK**, not DAPI, because of a HEMIT channel-order bug. Do not
-> use this checklist to launch it as a DAPI model. See `README.md`,
-> `docs/MODEL_CARD.md`, and `docs/RESULTS.md` for the corrected plan. This file
-> is retained as the launch process template for after the corrected DAPI model
-> and full evaluation exist.
+> **Status 2026-10-23:** the legacy 512 checkpoint is the real **H&E→DAPI
+> (`ch2`)** model; its HF generator and H5 target are verified. The 1024 `ch0`
+> models are the panCK ablation. The corrected 1024 `ch2` forward/reverse exist
+> but are undertrained; R-007 (unpaired reverse) is invalid for selection, so
+> the paired U-Net remains default. Stage 2.5 (longer 1024 paired, val-based
+> selection, colour/gradient losses) is **prepared but not launched**; it needs
+> the 2026-10-24 quota reset + approval. Do not launch bidirectional or
+> release-quality claims until the v0.2.0 gate in [`PLAN.md`](PLAN.md) is met.
+> This file is the launch process template.
 
 Goal: one coordinated launch **after** training completes and the real backend+frontend demo
 ships — not a trickle. This turns a 0-star repo into something shareable and citable.
@@ -16,8 +19,8 @@ Positioning (the hook):
 ---
 
 ## 0. Sequencing (do NOT launch before these)
-- [ ] **Corrected DAPI data** (`dapi = ch0`) is built and verified.
-- [ ] Corrected H&E → DAPI training reaches its target epoch and final metrics are recorded on the full 630-image val split.
+- [x] **Corrected DAPI data** (`dapi = mihc[...,2]`) is built and verified.
+- [ ] Corrected H&E→DAPI and DAPI→H&E pass the v0.2.0 gate: full 630 val + 945 test, CIs, same checkpoint SHA in API/UI/Docker/HF, and manual prod approval.
 - [ ] **v1.0** release cut: real **backend (FastAPI)** + **frontend** demo, not the stopgap Space.
 - [ ] Space weights refreshed with the **epoch-200** ONNX.
 - [ ] README "Results" gallery shows real before/after (issue #8).

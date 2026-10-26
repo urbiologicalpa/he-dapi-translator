@@ -25,6 +25,8 @@ model:
     gan_weight: 3.0
     l1_weight: 50.0
     ssim_weight: 10.0
+    # DISTS stays off: VGG weights may be unavailable offline on Kaggle.
+    # SSIM + colour + gradient cover structure, stain colour and sharpness.
     dists_weight: 0.0
     nuclei_aux_weight: 0.0
     color_weight: 20.0
@@ -46,6 +48,10 @@ training:
   export_onnx: false
   oom_guard: true
   max_cache_mb: 16
+  # Stage 2.5: fixed val subset -> checkpoint_best.pt / generator_best.pt.
+  val_h5: data/processed/hemit_val_1024.h5
+  val_num: 50
+  val_every: 1
 
 experiment:
   tracker: none

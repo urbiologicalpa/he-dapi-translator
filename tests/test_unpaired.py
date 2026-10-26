@@ -11,7 +11,7 @@ from src.models.train_unpaired import ResnetGenerator
 def test_resnet_generator_shape_and_range():
     G = ResnetGenerator(in_ch=1, out_ch=3, ngf=8, n_blocks=1).eval()
     with torch.no_grad():
-        out = G(torch.randn(1, 1, 32, 32))
+        out = G(torch.randn(1, 1, 32, 32) * 10)
     assert out.shape == (1, 3, 32, 32)
     assert float(out.min()) >= 0.0 and float(out.max()) <= 1.0
 

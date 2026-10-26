@@ -10,6 +10,9 @@ echo
 echo "--- memory ---"
 free -m
 echo
+echo "--- host safety (crash_guard preflight) ---"
+bash scripts/crash_guard.sh --preflight 2>&1 | tail -n 9
+echo
 echo "--- training processes ---"
 pgrep -af 'train_unpaired|train_paired|train_dapi' || echo "none"
 echo
@@ -25,8 +28,11 @@ echo
 echo "--- kaggle kernels ---"
 if [ -f "$HOME/.kaggle/api_token" ]; then
   for k in \
-    bikasash/he-dapi-cyclegan-hemit-dapi2he-1024 \
-    bikasash/he-dapi-cyclegan-hemit-dapi2he-256; do
+    bikasash/he-dapi-paired-stage25b-forward \
+    bikasash/he-dapi-paired-stage25-eval \
+    bikasash/he-dapi-paired-stage25-reverse \
+    bikasash/he-dapi-paired-ch2-1024-both \
+    bikasash/he-dapi-cyclegan-ch2-256-r-007; do
     KAGGLE_API_TOKEN="$(cat "$HOME/.kaggle/api_token")" \
       .venv/bin/kaggle kernels status "$k" 2>&1 | tail -1
   done

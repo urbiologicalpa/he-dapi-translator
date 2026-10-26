@@ -28,7 +28,7 @@ class ResnetGenerator(nn.Module):
         layers += [
             nn.ConvTranspose2d(ngf*4, ngf*2, 3,2,1,1), nn.InstanceNorm2d(ngf*2), nn.ReLU(True),
             nn.ConvTranspose2d(ngf*2, ngf, 3,2,1,1), nn.InstanceNorm2d(ngf), nn.ReLU(True),
-            nn.Conv2d(ngf, out_ch, 7,1,3), nn.Tanh()
+            nn.Conv2d(ngf, out_ch, 7,1,3), nn.Sigmoid()
         ]
         self.net = nn.Sequential(*layers)
     def forward(self,x):

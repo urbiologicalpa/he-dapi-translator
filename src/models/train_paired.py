@@ -8,6 +8,7 @@ Run:
   python src/models/train_paired.py --config configs/hemit_dual_branch.yaml
 """
 import argparse
+import math
 import time
 import yaml
 from pathlib import Path
@@ -216,6 +217,51 @@ def train_one_epoch(G, D, loader, optimG, optimD, device, losses, weights, grad_
         "grad": grad_accum_loss / denom,
     }
 
+
+def validate(G, loader, device, direction):
+    """Fixed-subset validation. Lower score is better (L1 + 0.25*(1-SSIM)).
+
+    SSIM is measured with skimage (same definition as eval_offline), NOT with
+    ``SSIMLoss``. ``SSIMLoss`` returns 1-SSIM (or a cosine proxy when kornia is
+    absent), so using it here inverted the best-checkpoint selection.
+    """
+    from skimage.metrics import structural_similarity
+
+    G.eval()
+    l1_fn = nn.L1Loss()
+    l1_sum = ssim_sum = psnr_sum = 0.0
+    n = 0
+    with torch.no_grad():
+        for batch in loader:
+            he = batch["he"].to(device)
+            dapi = batch["dapi"].to(device)
+            src, _, target = prepare_pair({"he": he, "dapi": dapi}, direction)
+            fake = G(src)
+            l1 = l1_fn(fake, target)
+            mse = torch.mean((fake - target) ** 2).item()
+            fake_np = fake[0].detach().cpu().numpy()
+            real_np = target[0].detach().cpu().numpy()
+            if fake_np.shape[0] == 1:
+                ssim = float(structural_similarity(real_np[0], fake_np[0], data_range=1.0))
+            else:
+                ssim = float(structural_similarity(real_np, fake_np, data_range=1.0, channel_axis=0))
+            l1_sum += l1.item()
+            ssim_sum += ssim
+            psnr_sum += 10.0 * math.log10(1.0 / max(mse, 1e-12))
+            n += 1
+    G.train()
+    n = max(1, n)
+    l1 = l1_sum / n
+    ssim = ssim_sum / n
+    return {
+        "l1": l1,
+        "ssim": ssim,
+        "psnr": psnr_sum / n,
+        "score": l1 + 0.25 * (1.0 - ssim),
+        "n": n,
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", type=str, default="configs/hemit_dual_branch.yaml")
@@ -231,6 +277,9 @@ def main():
     ap.add_argument("--epochs", type=int, default=None, help="override number of epochs")
     ap.add_argument("--max-steps", type=int, default=None, help="stop each epoch after N steps (smoke/timing)")
     ap.add_argument("--direction", type=str, default=None, choices=["he2dapi","dapi2he"], help="translation direction")
+    ap.add_argument("--val-h5", type=str, default=None, help="validation HDF5 (enables best-checkpoint selection)")
+    ap.add_argument("--val-num", type=int, default=None, help="number of fixed validation crops")
+    ap.add_argument("--val-every", type=int, default=None, help="validate every N epochs")
     args = ap.parse_args()
 
     # Resource monitor early
@@ -313,16 +362,36 @@ def main():
             loader_batch = advised
     loader = DataLoader(ds, batch_size=loader_batch, shuffle=True, num_workers=train_cfg.get("num_workers",0))
 
+    # Fixed validation subset for best-checkpoint selection (no augmentation).
+    val_h5 = args.val_h5 or train_cfg.get("val_h5")
+    val_num = args.val_num if args.val_num is not None else int(train_cfg.get("val_num", 0))
+    val_every = args.val_every if args.val_every is not None else int(train_cfg.get("val_every", 1))
+    val_loader = None
+    if val_h5 and val_num > 0:
+        if not Path(val_h5).exists():
+            print(f"[VAL WARN] {val_h5} not found -> best-checkpoint selection disabled")
+        else:
+            val_ds = PairedHEMITDataset(h5_path=val_h5, root_dir=root_dir,
+                                        patch_size=data_cfg.get("patch_size",512),
+                                        stain_norm=data_cfg.get("stain_norm","none"),
+                                        augment=False,
+                                        indices=range(val_num),
+                                        max_cache_mb=min(int(train_cfg.get("max_cache_mb",4)), 16))
+            val_loader = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=0)
+            print(f"[VAL] {val_num} fixed crops from {val_h5} every {val_every} epoch(s)")
+
     # Models: PatchGAN is conditioned on source (1 or 3 ch) + target (1 or 3 ch).
     in_ch, out_ch = (3, 1) if direction == "he2dapi" else (1, 3)
     G = UNetGenerator(in_ch=in_ch, out_ch=out_ch, ngf=model_cfg.get("generator",{}).get("ngf",64)).to(device)
     D = PatchGANDiscriminator(in_ch=4).to(device)
     optimG = torch.optim.Adam(G.parameters(), lr=train_cfg.get("lr",2e-4), betas=(0.5,0.999))
     optimD = torch.optim.Adam(D.parameters(), lr=train_cfg.get("lr",2e-4), betas=(0.5,0.999))
-    # Losses - DISTS disabled on CPU if dists_on_cpu false or low RAM to save 400MB VGG
-    use_dists = train_cfg.get("dists_on_cpu", False) and args.optimize_for!="lowram"
+    # Losses - DISTS only when weighted; GPU is always allowed, CPU needs opt-in.
+    use_dists = loss_cfg.get("dists_weight", 0.0) > 0 and (
+        torch.cuda.is_available() or (train_cfg.get("dists_on_cpu", False) and args.optimize_for != "lowram")
+    )
     if not use_dists:
-        print("[LOWRAM] DISTS disabled on CPU (saves 400MB VGG) -> using L1+SSIM only")
+        print("[LOSS] DISTS disabled (weight 0 or CPU without opt-in) -> L1+SSIM+optional color/grad")
     use_nuclei = loss_cfg.get("nuclei_aux_weight", 2.0) > 0
     use_color = loss_cfg.get("color_weight", 0.0) > 0
     use_grad = loss_cfg.get("grad_weight", 0.0) > 0
@@ -364,34 +433,53 @@ def main():
         if (ckpt_dir / "checkpoint_last.pt").exists():
             resume_path = ckpt_dir / "checkpoint_last.pt"
     if resume_path and Path(resume_path).exists():
+        ckpt = None
         try:
             ckpt = torch.load(str(resume_path), map_location=device)
-            ckpt_direction = ckpt.get("config", {}).get("data", {}).get("direction", "he2dapi")
-            if ckpt_direction != direction:
-                raise SystemExit(f"checkpoint direction {ckpt_direction} != requested {direction}")
-            G.load_state_dict(ckpt.get("G", ckpt.get("generator", ckpt)))
-            if "D" in ckpt:
-                D.load_state_dict(ckpt["D"])
-            if "optimG" in ckpt:
-                optimG.load_state_dict(ckpt["optimG"])
-            if "optimD" in ckpt:
-                optimD.load_state_dict(ckpt["optimD"])
-            for pg in optimG.param_groups:
-                pg["lr"] = train_cfg.get("lr", 2e-4)
-            for pg in optimD.param_groups:
-                pg["lr"] = train_cfg.get("lr", 2e-4)
-            start_epoch = ckpt.get("epoch", 0) + 1
-            if args.resume_epoch is not None:
-                start_epoch = args.resume_epoch
-            print(f"[RESUME] Loaded {resume_path} -> start_epoch {start_epoch}")
         except Exception as e:
-            print(f"[RESUME WARN] Failed to load {resume_path}: {e}, starting from 0")
+            print(f"[RESUME WARN] Could not read {resume_path}: {e}, starting from 0")
+        if ckpt is not None:
+            ckpt_direction = ckpt.get("config", {}).get("data", {}).get("direction")
+            # Legacy checkpoints predate the direction field (None). Only
+            # enforce a mismatch when the checkpoint records a direction.
+            if ckpt_direction and ckpt_direction != direction:
+                raise SystemExit(f"checkpoint direction {ckpt_direction} != requested {direction}")
+            try:
+                G.load_state_dict(ckpt.get("G", ckpt.get("generator", ckpt)))
+                if "D" in ckpt:
+                    D.load_state_dict(ckpt["D"])
+                if "optimG" in ckpt:
+                    optimG.load_state_dict(ckpt["optimG"])
+                if "optimD" in ckpt:
+                    optimD.load_state_dict(ckpt["optimD"])
+                for pg in optimG.param_groups:
+                    pg["lr"] = train_cfg.get("lr", 2e-4)
+                for pg in optimD.param_groups:
+                    pg["lr"] = train_cfg.get("lr", 2e-4)
+                start_epoch = ckpt.get("epoch", 0) + 1
+                if args.resume_epoch is not None:
+                    start_epoch = args.resume_epoch
+                print(f"[RESUME] Loaded {resume_path} -> start_epoch {start_epoch}")
+            except Exception as e:
+                print(f"[RESUME WARN] Failed to load {resume_path}: {e}, starting from 0")
 
     epochs = 2 if args.dummy else (args.epochs or train_cfg.get("epochs",200))
     save_every = train_cfg.get("save_every", 1)  # checkpoint every N epochs
     grad_accum = args.grad_accum or train_cfg.get("grad_accum", 1)
     oom_guard = train_cfg.get("oom_guard", True)
     print(f"[TRAIN] epochs {epochs} batch {loader_batch} grad_accum {grad_accum} effective {loader_batch*grad_accum} | oom_guard {oom_guard} | device {device}")
+    best_score = float("inf")
+    best_path = None
+    existing_best = ckpt_dir / "checkpoint_best.pt"
+    if existing_best.exists():
+        try:
+            best_ckpt = torch.load(str(existing_best), map_location="cpu")
+            if best_ckpt.get("val_score") is not None:
+                best_score = float(best_ckpt["val_score"])
+                best_path = existing_best
+                print(f"[BEST] Existing {existing_best} score {best_score:.4f}")
+        except Exception as e:
+            print(f"[BEST WARN] Could not read {existing_best}: {e}")
     for epoch in range(start_epoch, epochs):
         if mon: mon.check(f"train:epoch{epoch+1}:start")
         loss = train_one_epoch(G,D,loader,optimG,optimD,device,losses,weights, grad_accum=grad_accum, oom_guard=oom_guard, monitor=mon, max_steps=args.max_steps, direction=direction)
@@ -404,18 +492,26 @@ def main():
             print(f"[Epoch {epoch+1}/{epochs}] G loss {g_loss:.4f}")
         if mon: mon.check(f"train:epoch{epoch+1}:end")
 
+        val_metrics = None
+        if val_loader is not None and ((epoch+1) % val_every == 0 or (epoch+1) == epochs):
+            val_metrics = validate(G, val_loader, device, direction)
+            print(f"[VAL] Epoch {epoch+1} L1 {val_metrics['l1']:.4f} SSIM {val_metrics['ssim']:.4f} "
+                  f"PSNR {val_metrics['psnr']:.2f} score {val_metrics['score']:.4f} n {val_metrics['n']}")
+
+        ckpt = {
+            "epoch": epoch,
+            "G": G.state_dict(),
+            "D": D.state_dict(),
+            "optimG": optimG.state_dict(),
+            "optimD": optimD.state_dict(),
+            "loss": g_loss,
+            "loss_detail": loss if isinstance(loss, dict) else {"g": g_loss},
+            "val": val_metrics,
+            "val_score": val_metrics["score"] if val_metrics else None,
+            "config": cfg,
+        }
         # Save resumable checkpoint every save_every + always keep last
         if (epoch+1) % save_every == 0 or (epoch+1) == epochs:
-            ckpt = {
-                "epoch": epoch,
-                "G": G.state_dict(),
-                "D": D.state_dict(),
-                "optimG": optimG.state_dict(),
-                "optimD": optimD.state_dict(),
-                "loss": g_loss,
-                "loss_detail": loss if isinstance(loss, dict) else {"g": g_loss},
-                "config": cfg,
-            }
             # atomic save: write to tmp then rename
             tmp_path = ckpt_dir / f".tmp_checkpoint_epoch{epoch+1}.pt"
             final_path = ckpt_dir / f"checkpoint_epoch{epoch+1}.pt"
@@ -425,10 +521,21 @@ def main():
             torch.save(ckpt, last_path)
             print(f"[CHECKPOINT] Epoch {epoch+1} -> {final_path} + {last_path} (resumable: --resume {last_path})")
 
+        if val_metrics is not None and val_metrics["score"] < best_score:
+            best_score = val_metrics["score"]
+            best_path = ckpt_dir / "checkpoint_best.pt"
+            tmp_best = ckpt_dir / ".tmp_checkpoint_best.pt"
+            torch.save(ckpt, tmp_best)
+            tmp_best.rename(best_path)
+            torch.save(G.state_dict(), ckpt_dir / "generator_best.pt")
+            print(f"[BEST] Epoch {epoch+1} score {best_score:.4f} -> {best_path} + generator_best.pt")
+
     # Save final generator only (for inference) + keep last
     ckpt_path = ckpt_dir / "generator_last.pt"
     torch.save(G.state_dict(), ckpt_path)
     print(f"[SAVE] Generator -> {ckpt_path}")
+    if best_path:
+        print(f"[SAVE] Best checkpoint -> {best_path} (score {best_score:.4f})")
 
     if args.export_onnx or train_cfg.get("export_onnx") or args.dummy:
         dummy = torch.randn(1,in_ch,512,512).to(device)

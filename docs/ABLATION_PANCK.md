@@ -7,18 +7,20 @@
 > Do not delete this run; it has been relabeled under ADR-014. See
 > [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md).
 
-**Status: internal benchmark artifact. The title/filename are historical and
-will be corrected. Not a product release.**
+**Status: valid legacy H&E→DAPI baseline; not a product release.** The filename
+`ABLATION_PANCK.md` and `metrics_panck_512*.json` are historical; ADR-014
+established that this checkpoint was trained on `ch2`/DAPI. The numbers are DAPI
+metrics, not a panCK ablation.
 
-This run exists to validate the pipeline, resumability, and evaluation path. It
-must not be presented as H&E → DAPI.
+This run validated the pipeline, resumability, and evaluation path, and remains
+the strongest forward DAPI checkpoint until Stage 2.5.
 
 ## Provenance
 
 | Item | Value |
 |---|---|
-| Target | panCK, HEMIT label `ch2` (wrong target for this product) |
-| Data | `data/processed/hemit_{train,val,test}_512.h5` (legacy build) |
+| Target | **DAPI, HEMIT label `ch2` (blue)** |
+| Data | `data/processed/hemit_{train,val,test}_512.h5` (`dapi=mihc[...,2]`, verified 2026-10-23) |
 | Train / val / test | 3,717 / 630 / 945 |
 | Resolution | 512px central crop |
 | Epochs | 200 |
@@ -41,12 +43,14 @@ were computed with `skimage` / NumPy; Dice uses threshold 0.1.
 | val | 630 | 0.0252 | 29.23 | 0.7389 | 0.5072 | 0.1526 | 0.8012 |
 | test | 945 | 0.0217 | 30.65 | 0.7890 | 0.8781 | 0.4833 | 0.7007 |
 
-Raw JSON: [`metrics_panck_512.json`](metrics_panck_512.json).
+Raw JSON: [`metrics_panck_512.json`](metrics_panck_512.json) (historical
+filename; `label`/`target` corrected to DAPI on 2026-10-23). 50-crop
+re-verification: FID 146.27, LPIPS 0.2468, PSNR 29.52, SSIM 0.7662, Pearson
+0.5323, L1 0.0221 (`docs/metrics_dapi_512_legacy_val50.json`).
 
 Caveats:
 
-- The target is panCK, so these numbers cannot be compared with HEMIT DAPI
-  paper numbers or used in the DAPI benchmark table.
+- The target is DAPI `ch2`; the 1024 `ch0` run and R-006 are the panCK ablation.
 - The val/test Pearson gap is large; inspect per-image failures before treating
   either number as stable.
 - No standard deviations / bootstrap CIs are recorded yet. Add them before using
@@ -61,5 +65,5 @@ Caveats:
 - Full-split evaluation is now automated and labeled by target channel.
 - The pipeline can produce and persist a complete model without OOM.
 
-What it does **not** prove: DAPI quality, bidirectional capability, reverse
-translation, or clinical validity.
+What it does **not** prove: release-quality DAPI (no CIs, limited protocol),
+bidirectional capability, reverse translation, or clinical validity.

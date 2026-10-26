@@ -59,6 +59,12 @@ while true; do
     echo "[$(ts)] DONE flag present -> exit" >> "$LOG"
     exit 0
   fi
+  if ! bash scripts/crash_guard.sh --preflight >> "$LOG" 2>&1; then
+    echo "[$(ts)] BLOCKED by crash_guard preflight (unsafe host) -> retry in 300s" >> "$LOG"
+    sleep 300
+    continue
+  fi
+
   start=$(date +%s)
   echo "[$(ts)] START $(printf '%q ' .venv/bin/python -u -m src.models.train_unpaired "${args[@]}")" >> "$LOG"
   systemd-run --user --quiet --scope \

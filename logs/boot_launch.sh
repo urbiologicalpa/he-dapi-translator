@@ -21,6 +21,12 @@ if pgrep -f "keepalive_week.sh" > /dev/null 2>&1; then
 fi
 echo "[$(ts)] BOOT: keepalive dead -> launching train+watch+keepalive" >> "$LOG"
 
+# 0) hard host-safety gate: never relaunch into a full C:/swap/OOM state.
+if ! bash scripts/crash_guard.sh --preflight >> "$LOG" 2>&1; then
+  echo "[$(ts)] BOOT: BLOCKED by crash_guard preflight (disk/memory unsafe); see logs/crash_reports" >> "$LOG"
+  exit 0
+fi
+
 # 1) train FIRST (resume auto from checkpoint_last.pt), week-mode low-RAM
 if ! pgrep -f "train_paired.*hemit_dual_branch" > /dev/null 2>&1; then
   setsid nohup nice -n 10 env PYTHONPATH=. .venv/bin/python -u -m src.models.train_paired \

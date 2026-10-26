@@ -1,0 +1,23 @@
+{
+  "checkpoint": "/home/bikash/kaggle_out_stage25b_forward/checkpoints/dapi_quality/checkpoint_best.pt",
+  "file_epoch": 17,
+  "split": "val",
+  "direction": "he2dapi",
+  "resolution": 1024,
+  "n": 50,
+  "train_G_loss": 1.5182,
+  "val_L1": 0.0237,
+  "val_PSNR_dB": 28.86,
+  "val_SSIM": 0.7771,
+  "val_Pearson": 0.5851,
+  "val_SSIM_loss_proxy": 0.173,
+  "val_Dice_thresh01": 0.2018,
+  "val_D_loss": 0.7544,
+  "val_FID": 169.53,
+  "val_LPIPS": 0.2706,
+  "metric_n": 50,
+  "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
+  "evaluated": "2026-10-24T13:53:05.009134+00:00",
+  "label": "stage25b-forward-best",
+  "target": "DAPI ch2"
+}

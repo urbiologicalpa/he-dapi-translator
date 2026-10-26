@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-import io, gc
+import io, gc, hashlib
 import numpy as np
 from PIL import Image
 from pathlib import Path
@@ -13,7 +13,9 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 def _infer_tile(tile: np.ndarray, direction: str) -> np.ndarray:
     try:
         from src.models.infer import run_torch_model
-        ckpt = "resources/models/checkpoints/he2dapi/generator_last.pt" if direction=="he2dapi" else "resources/models/checkpoints/dapi2he/cyclegan_G_last.pt"
+        ckpt = ("resources/models/checkpoints/he2dapi/generator_last.pt"
+                if direction == "he2dapi" else
+                "resources/models/checkpoints/dapi2he_ch2_1024/generator_last.pt")
         return run_torch_model(tile, direction, checkpoint=ckpt if Path(ckpt).exists() else None)
     except Exception as e:
         # Fallback dummy
@@ -27,14 +29,32 @@ def _infer_tile(tile: np.ndarray, direction: str) -> np.ndarray:
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "models": ["he2dapi_pix2pix", "dapi2he_cyclegan"]}
+    return {"status": "ok", "models": ["he2dapi_unet_512", "dapi2he_unet_ch2_1024"]}
+
+def _model_info(path: str, patch: int) -> dict:
+    p = Path(path)
+    info = {"checkpoint": path, "patch": patch, "exists": p.exists()}
+    if p.exists():
+        h = hashlib.sha256()
+        with p.open("rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        info["sha256"] = h.hexdigest()
+    return info
+
 
 @app.get("/models")
 def list_models():
     return {
-        "he2dapi": {"checkpoint": "resources/models/checkpoints/he2dapi/he2dapi_pix2pix.onnx", "patch":512},
-        "dapi2he": {"checkpoint": "resources/models/checkpoints/dapi2he/cyclegan_G_last.pt", "patch":256},
-        "note": "Run python src/models/train_paired.py --dummy to generate checkpoints"
+        "he2dapi": _model_info("resources/models/checkpoints/he2dapi/generator_last.pt", 512),
+        "dapi2he": _model_info("resources/models/checkpoints/dapi2he_ch2_1024/generator_last.pt", 256),
+        "published": {
+            "hf_repo": "urbiologicalpa/he-dapi-translator",
+            "he2dapi_file": "he2dapi_unet_epoch169.pt",
+            "he2dapi_sha256": "c87751bbcdf2e80c43a691e4d576f0ece73cdc3b1414acd789a1d9b96ae2afdc",
+            "note": "HF epoch169 differs from local epoch200; align before v0.2.0",
+        },
+        "note": "Local checkpoints are used when present; otherwise the he-dapi package resolves HF weights. The old dapi2he/cyclegan_G_last.pt is invalid (aborted panCK run) and is not served.",
     }
 
 @app.post("/translate")

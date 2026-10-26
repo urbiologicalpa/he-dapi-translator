@@ -4,9 +4,11 @@
 > **`ch2=DAPI` (blue), `ch0=panCK` (red), `ch1=CD3` (green)**. The legacy 512
 > public weights are therefore the **real H&E→DAPI** model; the 1024 `ch0`
 > models and R-006 are panCK. ADR-014 is accepted, the 256 H5 has been rebuilt
-> on `ch2`, and the loader now prefers `mihc[...,2]`. A corrected 1024 DAPI
-> model and a valid DAPI→H&E model have **not** been trained yet. See
-> [`docs/CHANNEL_AUDIT.md`](docs/CHANNEL_AUDIT.md).
+> on `ch2`, and the loader now prefers `mihc[...,2]`. Corrected 1024 `ch2`
+> forward and reverse baselines now exist, but they are undertrained and **not
+> release quality**. The unpaired R-007 comparison was invalid for selection;
+> the paired U-Net remains default. See
+> [`docs/CHANNEL_AUDIT.md`](docs/CHANNEL_AUDIT.md) and [Results](#results).
 
 [![guards](https://github.com/urbiologicalpa/he-dapi-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/urbiologicalpa/he-dapi-translator/actions)
 [![status](https://img.shields.io/badge/status-alpha-orange)](#status)
@@ -19,19 +21,20 @@ Product scaffold for a **bidirectional H&E ↔ DAPI virtual staining tool**: one
 plugin/API/UI where a user can drop either modality and request the other, on
 patches or whole-slide images.
 
-**The bidirectional product is not available yet.** The only real DAPI model
+**The bidirectional product is not available yet.** The best forward DAPI model
 is the legacy 512px H&E→DAPI checkpoint; it is internal and not release quality.
-There is **no valid DAPI→H&E model** (the 1024 `ch0` reverse run is panCK→H&E).
-This repo does not claim a working bidirectional model until both directions
-have trained, evaluated weights. The product thesis is the unified workflow,
-not another one-way H&E → DAPI paper reproduction.
+A corrected 1024 `ch2` DAPI→H&E baseline now exists, but it is also undertrained
+and not release quality. This repo does not claim a working bidirectional model
+until both directions have trained, evaluated weights. The product thesis is
+the unified workflow, not another one-way H&E → DAPI paper reproduction.
 
 > **Important status (2026-10-23).** The earlier correction was backwards: the
 > legacy 512 pipeline used **`ch2` = DAPI**, while the 1024 `ch0` pipeline
 > trained **panCK**. The legacy 512 public checkpoint is therefore the real
-> H&E→DAPI model (re-verify provenance before release); the 1024 `ch0`
+> H&E→DAPI model (provenance verified: H5 `ch2` + HF SHA); the 1024 `ch0`
 > checkpoints and R-006 are the panCK ablation. The 256 H5 has been rebuilt on
-> `ch2`; a corrected 1024 DAPI baseline is still pending. See
+> `ch2`; corrected 1024 DAPI forward/reverse baselines now exist but are
+> undertrained. R-007 (unpaired CycleGAN) is invalid for selection. See
 > [Results](#results) and [`docs/MODEL_CARD.md`](docs/MODEL_CARD.md).
 
 ## Contents
@@ -55,16 +58,17 @@ not another one-way H&E → DAPI paper reproduction.
 | Area | State | Notes |
 |---|---|---|
 | Bidirectional plugin / one workflow | **Not available** | Direction router exists, but neither direction has release-quality weights; the product claim waits on those |
-| H&E → DAPI (legacy 512) | **Real baseline / internal** | 200 epochs, full 630/945 eval; non-paper protocol, re-verify provenance |
+| H&E → DAPI (legacy 512) | **Real baseline / internal** | 200 epochs, full 630/945 eval; provenance verified (H5 `ch2` + HF SHA); HF epoch169 vs local/API epoch200 must be aligned before v0.2.0 |
 | H&E → panCK ablation | **Complete / archived** | 1024 `ch0`; 20@512 + 1k@1024; full 630/945 eval; not DAPI |
-| DAPI → H&E | **Not available** | Only a panCK→H&E `ch0` baseline exists; invalid for DAPI |
-| Corrected 1024 DAPI | **Data ready, training pending** | 256 H5 rebuilt on `ch2`; no valid 1024 DAPI checkpoint yet |
+| DAPI → H&E (corrected `ch2`) | **Valid baseline / not release quality** | `dapi2he_ch2_1024`; 256px val50 FID 285.29 / LPIPS 0.5129; 1024px FID 282.92 |
+| Corrected 1024 DAPI forward | **Valid baseline / undertrained** | `he2dapi_ch2_1024`; 1024px val50 FID 215.38 / SSIM 0.7733; not release quality |
+| Unpaired CycleGAN (R-007) | **Invalid for selection** | Completed 12:13 UTC; eval omitted FID/LPIPS and used a Tanh/[0,1] mismatch; paired U-Net remains default |
 | Dual-branch Swin + FMF | **Not implemented** | `train_paired.py` currently builds the U-Net baseline |
 | Data pipeline | **Implemented** | HEMIT 5,292 pairs; 256 H5 rebuilt on `dapi=mihc[...,2]`; loader prefers `mihc[...,2]` |
 | Patch inference | **Implemented** | PyTorch + tiled 512px inference on CPU |
 | WSI inference | **Experimental** | Tiled/streaming path exists; not validated at scale |
 | Backend / frontend | **Alpha** | FastAPI + React drag-and-drop UI; Docker staging build |
-| PyPI packages | **Alpha** | `he-dapi` / `napari-he-dapi`; legacy 512 DAPI weights, provenance re-verification pending |
+| PyPI packages | **Alpha** | `he-dapi` / `napari-he-dapi`; legacy 512 DAPI weights, HF SHA verified |
 
 Hardware context:
 
@@ -94,10 +98,12 @@ direction, and only then expose both directions as one bidirectional plugin.
   loss. A corrected DAPI baseline is trained internally; it is the one-way
   baseline, not the bidirectional product.
 - **Implemented reverse baseline:** the same U-Net with `--direction dapi2he`
-  (1 → 3 channels), trained on the paired HEMIT data.
+  (1 → 3 channels), trained on the paired HEMIT data. The corrected `ch2`
+  checkpoint exists but is undertrained.
 - **Implemented unpaired baseline:** CycleGAN (`train_unpaired.py`, ResNet-9 +
-  PatchGAN) on 256px H5. The MHIST-domain run was negative/confounded; the fair
-  HEMIT-domain comparison is the current gate. CUT is not implemented.
+  PatchGAN) on 256px H5. R-007 completed but is invalid for selection (no
+  FID/LPIPS; Tanh/[0,1] mismatch); the paired U-Net remains default. CUT is not
+  implemented.
 - **Not implemented:** a unified bidirectional model, shared encoder/dual
   decoders, CUT, or release-quality reverse weights. A direction router exists.
 - **Planned:** the HEMIT dual-branch generator (CNN-ResNet + Swin-T + feature-map
@@ -133,9 +139,9 @@ The primary dataset is **HEMIT** (5,292 paired 1024×1024 patches):
 | Val | 630 |
 | Test | 945 |
 
-| H&E input | DAPI target (`ch0`) | panCK (`ch2`, old wrong target) |
+| H&E input | DAPI (`ch2`) | panCK (`ch0`) |
 |---|---|---|
-| ![H&E](data/examples/hemit_he_example.png) | ![DAPI](data/examples/hemit_dapi_ch0_example.png) | ![panCK](data/examples/hemit_panck_ch2_example.png) |
+| ![H&E](data/examples/hemit_he_example.png) | ![DAPI](data/examples/hemit_dapi_ch2_example.png) | ![panCK](data/examples/hemit_panck_ch0_example.png) |
 
 Raw files live under `data/raw/hemit/extracted/{train,val,test}/{input,label}`.
 HEMIT label TIFFs are 3-channel mIHC:
@@ -221,9 +227,9 @@ he-dapi translate -i he.png -o out.png -d he2dapi
 ```
 
 > The published `he-dapi` package resolves to the legacy 512 H&E→DAPI
-> checkpoint. Its provenance is being re-verified; until then, treat it as an
-> internal research model, not a validated DAPI product. The package will be
-> re-released with a re-verified checkpoint and a corrected model card.
+> checkpoint. Provenance is verified (H5 target is `mihc[...,2]`; HF SHA matches
+> local epoch169), but it remains an internal research model, not a validated
+> DAPI product. A v0.2.0 package will align the public/API/Docker checkpoint SHA.
 
 ## Training
 
@@ -239,22 +245,22 @@ This is the 512px, batch-2, grad-accum-4 legacy configuration. It reads
 `mihc[...,2]` (DAPI) and produced the 200-epoch legacy DAPI checkpoint. The
 1024 `ch0` U-Net run is the panCK ablation, not the DAPI experiment.
 
-### Corrected DAPI baseline (done, undertrained)
+### Corrected `ch2` baselines (done, undertrained)
 
-Current internal baseline:
+The corrected Kaggle run trained both directions on `mihc[...,2]` (DAPI):
 
-- 20 epochs at 512px on the corrected 1024px H5, then 2×500 steps at 1024px.
-- Kaggle Tesla T4, U-Net `ngf=64`, GAN + L1 + SSIM.
-- Full 630 val + 945 test evaluation.
-- Checkpoint: `resources/models/checkpoints/he2dapi_dapi_1024/checkpoint_last.pt`.
+- Forward `he2dapi_ch2_1024`: 1024px val50 FID 215.38, LPIPS 0.3899,
+  PSNR 27.91, SSIM 0.7733, Pearson 0.5515.
+- Reverse `dapi2he_ch2_1024`: 1024px val50 FID 282.92, LPIPS 0.5317,
+  PSNR 15.42, SSIM 0.4891, Pearson 0.6644; at 256px FID 285.29, LPIPS 0.5129.
+- Checkpoints: `resources/models/checkpoints/he2dapi_ch2_1024/` and
+  `resources/models/checkpoints/dapi2he_ch2_1024/`.
 
-Val/test SSIM is 0.670 / 0.725 and Pearson is 0.255 / 0.611. This is below the
-paper and not release quality.
-
-The paired reverse baseline is now trained too: val/test SSIM 0.437 / 0.593,
-Pearson 0.521 / 0.576. That is also undertrained and not release quality. Next:
-qualitative audit and the fair HEMIT-domain CycleGAN comparison, then a
-val-based architecture selection before longer 1024 quality passes.
+Both are valid but undertrained and **not release quality**. The unpaired
+CycleGAN R-007 was invalid for selection (no FID/LPIPS; Tanh/[0,1] mismatch),
+so the paired U-Net remains default. Next: Stage 2.5 paired quality pass
+(longer 1024, val-based selection; **prepared, awaiting the 2026-10-24 quota
+reset**), then full 630/945 + CIs.
 
 ## Inference
 
@@ -277,24 +283,33 @@ PYTHONPATH=. python src/models/infer.py \
   --out /tmp/wsi_synthetic.tiff
 ```
 
-The current H&E→DAPI checkpoint is the legacy 512 model. There is no valid
-DAPI→H&E checkpoint; corrected DAPI→H&E inference commands will be published
-after a `ch2` retrain.
+The current H&E→DAPI checkpoint is the legacy 512 model. A corrected
+DAPI→H&E U-Net is available at
+`resources/models/checkpoints/dapi2he_ch2_1024/generator_last.pt` and is served
+by the API, but it is undertrained, not release quality, and not yet in the
+PyPI packages:
+
+```bash
+PYTHONPATH=. python src/models/infer.py \
+  --input dapi.png --direction dapi2he \
+  --checkpoint resources/models/checkpoints/dapi2he_ch2_1024/generator_last.pt \
+  --out /tmp/synthetic_he.png
+```
 
 ## Results
 
 ### DAPI target: legacy 512 baseline
 
-The only real DAPI model is the legacy 512px 200-epoch run (`ch2`). Full 630
-val / 945 test:
+The only full-split DAPI model is the legacy 512px 200-epoch run (`ch2`).
+Full 630 val / 945 test:
 
 | Split | n | SSIM | Pearson | PSNR (dB) |
 |---|---:|---:|---:|---:|
 | val | 630 | 0.739 | 0.507 | 29.23 |
 | test | 945 | 0.789 | 0.878 | 30.65 |
 
-This is non-paper protocol and provenance is being re-verified. Do not treat it
-as release quality.
+This is non-paper protocol; provenance is verified (H5 target `mihc[...,2]` and
+HF SHA match). Do not treat it as release quality.
 
 Reference numbers from the HEMIT paper (DAPI column, for orientation only):
 
@@ -307,6 +322,19 @@ Reference numbers from the HEMIT paper (DAPI column, for orientation only):
 These are paper results on HEMIT, not results from this repository. The
 comparison protocol and table templates are in
 [`docs/BENCHMARK.md`](docs/BENCHMARK.md).
+
+### Corrected 1024 `ch2` baselines (50 val crops, undertrained)
+
+| Direction | px | FID ↓ | LPIPS ↓ | PSNR | SSIM | Pearson | L1 ↓ |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| H&E → DAPI (`he2dapi_ch2_1024`) | 1024 | 215.38 | 0.3899 | 27.91 | **0.7733** | 0.5515 | 0.0250 |
+| DAPI → H&E (`dapi2he_ch2_1024`) | 1024 | **282.92** | **0.5317** | 15.42 | 0.4891 | **0.6644** | 0.1505 |
+| DAPI → H&E, same checkpoint | 256 | 285.29 | 0.5129 | 15.45 | 0.4772 | 0.6286 | 0.1548 |
+
+These are valid `ch2` baselines, but both directions remain undertrained and
+**not release quality**. The unpaired R-007 CycleGAN was invalid for selection
+(no FID/LPIPS; Tanh/[0,1] mismatch), so the paired U-Net remains default. Full
+630/945 + CIs are still required before any v0.2.0 claim.
 
 ### panCK ablation (do not read as DAPI)
 
@@ -348,11 +376,11 @@ Generated artifacts are git-ignored:
 - [x] Confirm Kaggle T4 availability and the free GPU quota path.
 - [x] Archive the panCK ablation and record full 630/945 benchmark numbers.
 - [x] Build and verify 256px HEMIT HDF5 on `dapi=mihc[...,2]`.
-- [ ] Train a corrected U-Net H&E → DAPI baseline on `ch2` data.
+- [x] Train a corrected U-Net H&E → DAPI baseline on `ch2` data (undertrained).
 - [x] Run the full 630-image validation and 945-image held-out test evaluation.
 - [ ] Implement/vendor the dual-branch Swin-T + FMF generator.
 - [x] Train panCK → H&E `ch0` ablation; full 630/945 eval.
-- [ ] Run a valid DAPI → H&E comparison on the rebuilt `ch2` 256 H5.
+- [x] Run a DAPI → H&E comparison on the rebuilt `ch2` 256 H5; R-007 unpaired run was invalid for selection.
 - [x] Add a direction router so one plugin/API accepts either modality.
 - [x] Benchmark 512px tiled / ONNX/INT8 CPU inference (`docs/BENCHMARK.md`).
 - [ ] Ship **bidirectional v1** only after both directions have trained, evaluated
@@ -365,15 +393,16 @@ Generated artifacts are git-ignored:
   been reviewed by pathologists or validated for diagnosis.
 - **Not bidirectional yet.** The direction router exists, but neither model is
   release quality, so the product claim waits.
-- **Current weights are panCK, not DAPI.** The channel-order correction
-  invalidates the old demo and metrics for DAPI.
+- **Public weights are the legacy 512 DAPI model.** The 1024 `ch0`
+  checkpoints and R-006 are panCK and must not be presented as DAPI.
 - **Reverse model is a baseline only.** DAPI → H&E is trained/evaluated but not release quality.
 - **Architecture gap.** The config and README previously described a
   dual-branch Swin/FMF model that the trainer did not implement. The code now
   documents the U-Net baseline explicitly; the dual-branch is still planned.
-- **Validation is full-split but not clinical.** Paired baselines use 630 val /
-  945 test; the unpaired comparison still needs the corrected run and a blinded
-  qualitative audit. There is no clinical validation.
+- **Validation is full-split but not clinical.** The legacy baseline uses 630
+  val / 945 test; the corrected `ch2` baselines have 50-crop selection metrics.
+  The unpaired R-007 run was invalid for selection. There is no clinical
+  validation.
 - **CPU limits.** Full 1024px inference/training does not fit comfortably on
   3.7 GB RAM. Deployment will require tiled inference and likely quantization
   or distillation.

@@ -1,11 +1,11 @@
 {
-  "label": "panck-ch2-512-epoch200",
-  "target": "panCK ch2 (HEMIT label channel 2) \u2014 ablation, NOT DAPI",
+  "label": "legacy-512-dapi-epoch200",
+  "target": "DAPI ch2 (HEMIT blue)",
   "checkpoint": "resources/models/checkpoints/he2dapi/checkpoint_epoch200.pt",
   "checkpoint_sha256": "6789d7d244cc6ac93dffd98a30ed2c17498aa7ee6081560dedac5173b44042aa",
   "generator_sha256": "849697d73e9315a558d5963d1fa256e79fdaeefd1eb541017a1f196596f8891a",
   "git_sha": "b2eebf8b86885f1ce3c024281996cdec82166e29",
-  "data": "data/processed/hemit_{split}_512.h5 (legacy wrong-target build)",
+  "data": "data/processed/hemit_{split}_512.h5 (dapi = mihc[...,2], verified 2026-10-23)",
   "resolution": 512,
   "train_pairs": 3717,
   "val": {
@@ -24,8 +24,8 @@
     "val_D_loss": 0.8012,
     "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
     "evaluated": "2026-10-21T04:41:36.478495+00:00",
-    "label": "panck-ch2-512-epoch200",
-    "target": "panCK ch2 ablation"
+    "label": "legacy-512-dapi-epoch200",
+    "target": "DAPI ch2"
   },
   "test": {
     "checkpoint": "resources/models/checkpoints/he2dapi/checkpoint_epoch200.pt",
@@ -43,8 +43,10 @@
     "val_D_loss": 0.7007,
     "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
     "evaluated": "2026-10-21T05:09:46.099529+00:00",
-    "label": "panck-ch2-512-epoch200",
-    "target": "panCK ch2 ablation"
+    "label": "legacy-512-dapi-epoch200",
+    "target": "DAPI ch2"
   },
-  "caveat": "This is an H&E -> panCK ablation, not a DAPI model. Dice uses threshold 0.1."
+  "caveat": "This is the real H&E->DAPI (ch2) legacy 512 model. The 1024 ch0 run and R-006 are the panCK ablation. Dice uses threshold 0.1.",
+  "historical_filename": "metrics_panck_512.json",
+  "correction": "2026-10-23 ADR-014: this checkpoint is the real H&E->DAPI (ch2) baseline, not panCK. The filename/label are historical; numbers are valid DAPI metrics. See docs/CHANNEL_AUDIT.md."
 }

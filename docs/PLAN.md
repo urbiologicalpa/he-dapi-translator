@@ -1,15 +1,17 @@
 # PLAN v2.0 — canonical product + research plan
 
-> **BLOCKER 2026-10-23 — channel audit reverses ADR-001.**
+> **Channel audit RESOLVED 2026-10-23 — ADR-014 accepted.**
 > The raw HEMIT RGB TIFF has **ch2=DAPI (blue), ch0=panCK (red), ch1=CD3
 > (green)**. The legacy 512 model is the real DAPI model; the 1024 `ch0`
-> forward/reverse models and R-006 are panCK. All DAPI runs/claims are frozen.
-> **ADR-014 is accepted**; see [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md). The 256
-> H5 rebuild is complete and verified; the loader reads `mihc[...,2]`. Do not
-> launch a 1024 DAPI run from a `ch0` cache; a corrected `ch2` baseline is
-> still pending.
+> forward/reverse models and R-006 are panCK and must not be presented as DAPI.
+> See [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md). The 256 H5 rebuild is complete and
+> verified; the loader reads `mihc[...,2]`. The corrected `ch2` 1024 baseline is
+> complete but undertrained (see `RESULTS.md`). **R-007** (Stage 2.3, unpaired
+> `ch2` 256) completed 12:13 UTC but is **INVALID for selection** (no FID/LPIPS;
+> Tanh/[0,1] mismatch). The paired U-Net remains default; Stage 2.5 is
+> running now and will resume after the quota reset.
 
-**Status:** authoritative as of **2026-10-22 16:40 UTC**. Supersedes
+**Status:** authoritative as of **2026-10-23 12:57 UTC**. Supersedes
 `docs/WORKPLAN.md` v1.1 (kept only as history).
 **Owner:** user (`urbiologicalpa`) + coding agent.
 **Read order for any LLM/new session:**
@@ -64,7 +66,7 @@ The old 12-week Gantt is replaced by **evidence-gated stages**. A stage is not
 |---|---|---|
 | 0. Truth & infra | CI green, Docker build, resource guards, channel regression tests | **DONE** |
 | 1. Data contract | `ch2=DAPI` proof, loader precedence, 256 H5 rebuilt/verified, no leakage, checksums | **DONE (re-closed 2026-10-23)** |
-| 2. Model baselines | Valid `ch2` forward + reverse paired baselines; fair unpaired comparison; selection memo | **IN PROGRESS**; legacy 512 DAPI verified, 1024 `ch0` is panCK, corrected `ch2` both-direction run active |
+| 2. Model baselines | Valid `ch2` forward + reverse paired baselines; fair unpaired comparison; selection memo | **PAIRED SELECTED**; valid 1024 `ch2` both-direction baselines complete (50-crop), quality gate not passed; R-007 unpaired run invalid, so paired remains default; Stage 2.5 running (resumable) |
 | 3. Validation | Full-split metrics, CIs, qualitative/blinded audit, failure analysis, limitations | **PARTIAL** |
 | 4. Product integration | Router + API/UI + WSI + ONNX + model manifest, same checkpoint everywhere | **ALPHA** |
 | 5. Release | Staging UAT, manual prod approval, model card, rollback | **ALPHA** |
@@ -74,16 +76,49 @@ The old 12-week Gantt is replaced by **evidence-gated stages**. A stage is not
 
 | Sub-stage | Hypothesis / purpose | Gate |
 |---|---|---|
-| 2.1 Forward paired baseline | U-Net can learn H&E→DAPI (`ch2`) | Legacy 512 `ch2` verified (50-crop FID 146.27, SSIM 0.7662); corrected 1024 `ch2` running. **1024 `ch0` run is panCK, invalid.** |
-| 2.2 Reverse paired baseline | U-Net can learn DAPI→H&E | **No valid run.** The 1024 `ch0` reverse is panCK→H&E. Corrected `ch2` running. |
-| 2.3 Fair unpaired comparison | CycleGAN on **HEMIT** H&E (same target domain, same 256px eval) is competitive with paired reverse | **BLOCKED**; R-006 is `ch0` panCK. Re-run on rebuilt `ch2` 256 only after 2.1/2.2. |
-| 2.4 Reverse model selection | Pick paired vs unpaired using **val** FID/LPIPS + blinded qualitative audit + cost; test only once | Not started |
-| 2.5 Quality pass | Longer 1024 schedule, val-based checkpoint selection, perceptual/color losses, dual-branch forward | Not started |
+| 2.1 Forward paired baseline | U-Net can learn H&E→DAPI (`ch2`) | Legacy 512 `ch2` verified (FID 146.27, SSIM 0.7662). Corrected 1024 `ch2` fine-tune exists (FID 215.38, SSIM 0.7733, Pearson 0.5515, 50 val crops) but **does not beat legacy on FID/LPIPS/PSNR/L1**; longer fine-tune needed. |
+| 2.2 Reverse paired baseline | U-Net can learn DAPI→H&E | **Valid first baseline:** corrected 1024 `ch2` reverse, 50 val crops at **1024 px**, FID 282.92, LPIPS 0.5317, PSNR 15.42, SSIM 0.4891, Pearson 0.6644; the same checkpoint at **256 px** (the R-007 protocol) gives FID 285.29, LPIPS 0.5129. Not release quality. |
+| 2.3 Fair unpaired comparison | CycleGAN on **HEMIT** H&E (same target domain, same 256px eval) is competitive with paired reverse | **COMPLETE 12:13 UTC, exit 0 — INVALID for selection.** The eval omitted `--metrics fid,lpips`, so no FID/LPIPS; raw metrics also used Tanh output against `[0,1]` targets. 10-epoch smoke, not a fair verdict. See `LIVE_STATE.md` §0.5. |
+| 2.4 Reverse model selection | Pick paired vs unpaired using **val** FID/LPIPS + blinded qualitative audit + cost; test only once | **CLOSED 12:20 UTC: paired U-Net remains default.** Unpaired produced no valid comparison; `docs/selection_reverse.md` records the invalid run and the decision. |
+| 2.5 Quality pass | Longer 1024 schedule, val-based checkpoint selection, perceptual/color losses, dual-branch forward | **RUNNING 12:56 UTC (resumable)** on `bikasash/he-dapi-paired-stage25-reverse`; quota will stop after ~1–2 epochs; resume after `2026-10-24 00:00 UTC`. Reverse first; forward after. |
 
-**Do not start 2.5 before 2.4.** A longer run on the wrong architecture is
-wasted GPU quota.
+**2.4 is closed; 2.5 is running.** A longer run on the wrong architecture would
+waste GPU quota. A continued plain 1024 fine-tune of the corrected `ch2` seed
+counts as completing 2.1/2.2, not as the 2.5 quality recipe.
 
-### Immediate stage (2.3) — exact experiment contract
+### Stage 2.5 — running experiment contract (resumable)
+
+**Goal:** test whether a longer paired 1024 fine-tune with stain-colour and
+sharpness losses plus val-based selection beats the current reverse baseline
+(FID 282.92 / LPIPS 0.5317 at 1024; 285.29 / 0.5129 at 256). Reverse first;
+forward only after the reverse result is understood.
+
+- **Seed:** `resources/models/checkpoints/dapi2he_ch2_1024/checkpoint_last.pt`
+  SHA-256 `5f930960…ba870f98` (epoch 1). Do not reseed from CycleGAN.
+- **Data:** `hemit_train_1024.h5` only; fixed 50-crop val from
+  `hemit_val_1024.h5`; test 945 touched once after selection.
+- **Config:** `configs/hemit_dapi2he_quality_1024.yaml` — 4 epochs, batch 1,
+  grad-accum 8, lr 3e-5, fp32; GAN 3 / L1 50 / SSIM 10 / colour 20 / gradient
+  25; DISTS 0 (offline VGG risk); `val_h5`, `val_num: 50`, `val_every: 1`.
+- **Selection:** fixed val `score = L1 + 0.25 × (1 − SSIM)`; save
+  `checkpoint_best.pt` + `generator_best.pt`; final FID/LPIPS on best and last
+  at 1024, 50 metric crops; choose by FID then LPIPS.
+- **Compute:** ~14,868 microbatches (~1,859 optimizer steps). Measured 1024
+  fine-tune speed on the T4 was ~0.53 s/microbatch → **~2.2 h train + ~0.5 h
+  eval**. Stop at 4 h, OOM, CUDA unavailable, or no epoch progress in 20 min;
+  keep partial checkpoints.
+- **Kernels:** `bikasash/he-dapi-paired-stage25-reverse` (train, internet off)
+  and `bikasash/he-dapi-paired-stage25-eval` (internet on for FID/LPIPS).
+  Staged under `/home/bikash/kaggle_stage/stage25_{code,seed,kernel,eval}/`.
+- **Gate:** lower val FID **and** LPIPS than the baseline, no obvious colour
+  collapse/hallucination; otherwise record a negative result and do not promote.
+  Full 630/945 + CIs remain required for v0.2.0.
+
+### Immediate stage (2.3) — exact experiment contract (CLOSED, kept as history)
+
+**Result 2026-10-23 12:13 UTC:** R-007 completed but is invalid for selection
+(no FID/LPIPS; Tanh/[0,1] mismatch). The contract below is historical; do not
+relaunch it.
 
 - **Hypothesis H0:** with H5-only HEMIT data and identical 256px evaluation,
   CycleGAN is competitive with the paired reverse baseline on FID/LPIPS.
@@ -92,11 +127,14 @@ wasted GPU quota.
 - **Model:** CycleGAN, ResNet-9 generators, PatchGAN discriminators, as in
   `configs/cyclegan_hemit_dapi2he_kaggle.yaml`.
 - **Compute:** Kaggle T4, 10 epochs, batch 4 × grad-accum 2, AMP on.
-- **Primary metrics:** FID and LPIPS on 630 val crops (same protocol as the
-  paired baseline). **Secondary:** PSNR/SSIM/L1 (diagnostic only for unpaired),
-  color/contrast stats, qualitative grid.
-- **Paired reference:** reverse 1024 baseline at 256px:
-  FID 342.98, LPIPS 0.5904, PSNR 13.17, SSIM 0.4941, L1 0.2056.
+- **Primary metrics:** FID and LPIPS on the **first 50** val crops
+  (`eval_offline --metric-num`, default 50), matching the paired reference;
+  PSNR/SSIM/L1 cover all 630 rows. Use a bootstrap CI; a <1–2 % gap is not a
+  win. **Secondary:** color/contrast stats and a qualitative grid.
+- **Paired reference (corrected ch2):** `dapi2he_ch2_1024` at 256px, 50 val
+  crops: **FID 285.29, LPIPS 0.5129, PSNR 15.45, SSIM 0.4772, L1 0.1548**
+  (`docs/metrics_ch2_1024_reverse_256_val50.json`). The old
+  `342.98 / 0.5904` reference is **ch0 panCK and must not be used**.
 - **Decision rule:** if CycleGAN has lower FID **and** LPIPS (or a clearly
   better blinded qualitative result at similar FID) with no hallucination
   pattern, it advances to 2.4. Otherwise the paired U-Net remains default and
@@ -115,10 +153,10 @@ wasted GPU quota.
 ### 3.1 Data
 - HEMIT: 5,292 aligned pairs, splits 3,717 / 630 / 945.
 - **Channel audit (2026-10-23): the raw RGB TIFF is `ch2=DAPI` (blue),
-  `ch0=panCK` (red), `ch1=CD3` (green). ADR-001 is reversed by proposed
-  ADR-014. The old 512 H5 used ch2, so the legacy model/public weights are the
-  real **H&E→DAPI** baseline; the 1024 `ch0` models are the panCK ablation.**
-  All DAPI claims are frozen until the H5 is rebuilt on ch2.
+  `ch0=panCK` (red), `ch1=CD3` (green). ADR-014 accepted. The old 512 H5 used
+  ch2, so the legacy model/public weights are the real **H&E→DAPI** baseline;
+  the 1024 `ch0` models are the panCK ablation.** The 256 H5 has been rebuilt
+  and verified on ch2; the corrected 1024 ch2 run is complete.
 - "Corrected" 1024 H5 (currently `ch0`/panCK): train 11.5GB, val 2.1GB, test
   3.0GB. Must be rebuilt with `dapi=mihc[...,2]` before any DAPI run.
 - Derived 256 H5 (center crop, LZF): train 596MB, val 104MB, test 148MB.
@@ -147,9 +185,10 @@ FID/LPIPS at 256 (50 val crops unless stated):
   Docker staging; PyPI `he-dapi` + `napari-he-dapi`; HF demo.
 - Direction router `detect_direction` (threshold 0.06) exists.
 - ONNX FP32 CPU benchmark recorded (`docs/BENCHMARK.md`).
-- **Caveat (2026-10-23 audit):** the legacy 512 public weights/demo are the
-  real H&E→DAPI model (`ch2`); the 1024 `ch0` models are panCK and must not be
-  presented as DAPI.
+- **Verified (2026-10-23):** the legacy 512 public weights/demo are the real
+  H&E→DAPI model (`ch2`): H5 target array-equal to `mihc[...,2]`, HF SHA
+  `c87751…e2afdc`, 46/46 generator tensors match local epoch169. The 1024
+  `ch0` models are panCK and must not be presented as DAPI.
 
 ### 3.4 Compute
 - Local: 3.7GB RAM, 1GB swap, CPU only. Full 4-network training is unsafe.
@@ -317,7 +356,8 @@ consequences. Add new entries; do not rewrite history.
 | R-003 | 2026-10-21/22 | Kaggle T4 | reverse H&E paired 512→1024 | complete, undertrained | `docs/RESULTS.md` |
 | R-004 | 2026-10-22 | Kaggle T4 | CycleGAN MHIST H&E | complete, negative/confounded | `docs/metrics_dapi2he_cyclegan_256.json` |
 | R-005 | 2026-10-22 14:25 | Kaggle T4 | CycleGAN HEMIT (stale bundle) | **INVALID, cancelled** | `LIVE_STATE.md` §4 |
-| R-006 | 2026-10-22 17:20 | Kaggle T4 | CycleGAN HEMIT corrected 256 | **RUNNING (v3)** | `bikasash/he-dapi-cyclegan-hemit-dapi2he-256`; code ds `bikasash/he-dapi-code-hemit-256`; v1/v2 no-op (missing main guard) |
+| R-006 | 2026-10-22 17:20 | Kaggle T4 | CycleGAN HEMIT 256 | **COMPLETE 18:55 UTC; INVALID target (ch0 panCK)** | `bikasash/he-dapi-cyclegan-hemit-dapi2he-256`; 10 epochs, exit 0; metrics not usable for DAPI |
+| R-007 | 2026-10-23 10:38 UTC | Kaggle T4 | CycleGAN HEMIT **ch2** 256 fairness run | **COMPLETE 12:13 UTC; INVALID for selection** | kernel `bikasash/he-dapi-cyclegan-ch2-256-r-007`; 10/10 epochs, exit 0; no FID/LPIPS (kernel omitted `--metrics`), Tanh/[0,1] mismatch; `LIVE_STATE.md` §0.5 |
 
 ---
 
@@ -352,16 +392,29 @@ consequences. Add new entries; do not rewrite history.
 
 ## 8. Next actions (in order)
 
-1. **Stop R-005** (invalid Kaggle session) via the Kaggle UI, or confirm it
-   exited. Do not launch R-006 while R-005 holds the T4.
-2. **Launch R-006** (corrected 256 kernel) and verify the first log lines:
-   `HE: 0 files + H5 …`, `synthetic=False`, `[LOWRAM]` absent on GPU,
-   `cuda=True`.
-3. After R-006: write `docs/selection_reverse.md` comparing paired vs unpaired
-   on val FID/LPIPS + qualitative; pick the default; update RESULTS/TRACKER.
-4. If paired wins: spend next GPU budget on 2.5 reverse quality (longer 1024,
-   val-based selection). If unpaired wins: test CUT only if hallucination is the
-   blocker, not by default.
-5. Update README status table (direction router and CycleGAN are implemented;
-   public weights remain the panCK ablation) before any new public claim.
-6. Rotate the Kaggle token that was exposed during auth debugging.
+1. ~~**Recover host disk first.**~~ Done 2026-10-23 10:37 UTC; C: ~9.9 GB
+   free at 12:20 UTC (pagefile-dependent), preflight `SAFE`; see
+   `LIVE_STATE.md` §0.4.
+2. ~~**Push and finish R-007**~~ Done 10:38–12:13 UTC; 10/10 epochs, exit 0.
+   The run is **invalid for selection**: no FID/LPIPS and a Tanh/[0,1] mismatch.
+   Do not rerun CycleGAN; paired U-Net remains default.
+3. ~~**Write the selection memo**~~ Done 12:20 UTC:
+   `docs/selection_reverse.md` records R-007 as invalid and selects the paired
+   reverse `dapi2he_ch2_1024` baseline for Stage 2.5. No bootstrap CI is
+   possible without valid R-007 metrics.
+4. **Stage 2.5 is running** (pushed 12:56 UTC): `train_paired.py` now does
+   fixed-subset validation and best-checkpoint selection; eval requests
+   FID/LPIPS. Let the first attempt save epoch checkpoints, then after the
+   2026-10-24 00:00 UTC reset pull the output, create a resume dataset, and
+   re-push `bikasash/he-dapi-paired-stage25-reverse`; then the eval kernel. Do
+   not start CUT or another CycleGAN run by default.
+5. Align the public/API/Docker checkpoint SHA before v0.2.0: the HF/package
+   artifact is epoch169, while the API/Docker local fallback is epoch200.
+   Recommended: publish epoch200 (`/home/bikash/hf_stage/epoch200/`) and update
+   `WEIGHT_FILES`, with user approval. Until then, do not claim one model.
+6. Update README status table (direction router and CycleGAN are implemented;
+   public weights are the legacy 512 DAPI model; no bidirectional/release claim
+   until v0.2.0) before any new claim.
+7. Full 630/945 + CIs and SHA manifests are required for the v0.2.0 gate; the
+   50-crop selection is not a release claim.
+8. Rotate the Kaggle token that was exposed during auth debugging.

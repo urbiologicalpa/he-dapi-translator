@@ -1,0 +1,23 @@
+{
+  "checkpoint": "/home/bikash/kaggle_ch2_output/checkpoints/dapi_pretrain/checkpoint_last.pt",
+  "file_epoch": 14,
+  "split": "val",
+  "direction": "he2dapi",
+  "resolution": 512,
+  "n": 50,
+  "train_G_loss": 2.0182,
+  "val_L1": 0.0296,
+  "val_PSNR_dB": 27.54,
+  "val_SSIM": 0.7431,
+  "val_Pearson": 0.2877,
+  "val_SSIM_loss_proxy": 0.2723,
+  "val_Dice_thresh01": 0.0381,
+  "val_D_loss": 0.8002,
+  "val_FID": 184.73,
+  "val_LPIPS": 0.4044,
+  "metric_n": 50,
+  "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
+  "evaluated": "2026-10-23T09:26:05.932116+00:00",
+  "label": "he2dapi-ch2-1024-pretrain512",
+  "target": "DAPI ch2"
+}

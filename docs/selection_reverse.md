@@ -1,11 +1,12 @@
 # Reverse architecture selection (Stage 2.4)
 
-> **Status: BLOCKED — INVALID TARGET (2026-10-23).** Both candidates were
-> trained on `ch0`, which the channel audit identifies as **panCK**, not DAPI.
-> R-006 is a panCK→H&E result; do not select a DAPI architecture from it.
-> See [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md). ADR-014 is accepted and the 256
-> H5 is rebuilt; re-run on `ch2` before selecting a DAPI architecture.
-> Decision rule: `docs/PLAN.md` Stage 2.3 / ADR-008 (val only, test once).
+> **Status: CLOSED 2026-10-23 12:20 UTC — paired U-Net selected by default.**
+> R-007 (`bikasash/he-dapi-cyclegan-ch2-256-r-007`) completed 12:13 UTC but is
+> **invalid for selection**: its eval omitted `--metrics fid,lpips` and its
+> Tanh output was compared against `[0,1]` targets. No valid unpaired FID/LPIPS
+> exists, so the paired `dapi2he_ch2_1024` U-Net remains the Stage 2.5
+> architecture. Do not use R-006 or any `ch0` row for DAPI.
+> See [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md) and `docs/PLAN.md` Stage 2.3/2.4.
 
 ## Question
 
@@ -16,15 +17,35 @@ evaluation crops, and validation data only.
 ## References
 
 - Paired reverse baseline: `docs/RESULTS.md`, checkpoint
-  `resources/models/checkpoints/dapi2he_1024/checkpoint_last.pt`.
-- Unpaired run: `bikasash/he-dapi-cyclegan-hemit-dapi2he-256` (v3), config
-  `configs/cyclegan_hemit_dapi2he_kaggle.yaml`.
-- Evaluation protocol: 630 val crops, 256px; FID/LPIPS primary; PSNR/SSIM/L1
-  diagnostic for unpaired (alignment is not guaranteed).
+  `resources/models/checkpoints/dapi2he_ch2_1024/checkpoint_last.pt`
+  (SHA-256 `5f930960…a870f98`), 256 px / 50 val crops.
+- Unpaired run: `bikasash/he-dapi-cyclegan-ch2-256-r-007` (v1), config
+  `configs/cyclegan_hemit_dapi2he_kaggle.yaml`, `ch2` H5 only.
+- Evaluation protocol: 630 val rows at 256px; FID/LPIPS on the first 50
+  (`metric_num=50`), matching the paired reference; PSNR/SSIM/L1 diagnostic for
+  unpaired (alignment is not guaranteed).
 - Prior negative: MHIST-domain CycleGAN (FID 362.34, LPIPS 0.6999) was
   confounded by a different H&E target domain.
 
-## Metrics (fill from the run)
+## Valid ch2 comparison (R-007)
+
+| Model | Target domain | rows / metric n | FID ↓ | LPIPS ↓ | PSNR | SSIM | L1 ↓ |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Paired reverse `dapi2he_ch2_1024` @256 | HEMIT H&E | 50 / 50 | **285.29** | **0.5129** | 15.45 | 0.4772 | 0.1548 |
+| CycleGAN R-007 `ch2` 256 | HEMIT H&E | 630 / 50 | **invalid (null)** | **invalid (null)** | 8.45\* | 0.2215\* | 0.3449\* |
+
+\*Raw R-007 diagnostics are invalid because the generator used Tanh (`[-1,1]`)
+while eval compared it with `[0,1]` targets. A 5-crop spot check with correct
+denormalization gives PSNR 12.25 / SSIM 0.3698 / Pearson -0.2975, still far
+below the paired reference. The 10-epoch run is also undertrained. **No
+selection can be made from these numbers.**
+
+The paired row is `docs/metrics_ch2_1024_reverse_256_val50.json`. R-007's
+`eval_cyclegan.json` is at
+`/home/bikash/kaggle_r007_output/checkpoints/hemit_cyclegan_ch2_256/eval_cyclegan.json`;
+its `val_FID` and `val_LPIPS` are null. Do not fill a winner row from it.
+
+## Invalid ch0 rows (do not use for DAPI)
 
 | Model | Target domain | n | FID ↓ | LPIPS ↓ | PSNR | SSIM | L1 ↓ |
 |---|---|---:|---:|---:|---:|---:|---:|
@@ -36,18 +57,12 @@ reverse DAPI decision. The R-006 630-crop JSON (L1 0.2543, PSNR 10.61, SSIM
 0.2051, Pearson 0.1537) is in `/tmp/k256_eval/`; the 50-crop row above is the
 fair comparison to the paired baseline.
 
-\*The paired reference FID/LPIPS was measured on 50 val crops. Re-run the paired
-checkpoint with `--num 630` before declaring a winner if the unpaired run used
-630; otherwise compare on the same 50-crop subset and say so.
+## Qualitative audit
 
-## Qualitative audit (required before a decision)
-
-- [ ] 6–10 paired examples: DAPI input, real H&E, paired output, CycleGAN output.
-- [ ] Check colour/contrast collapse, checkerboard, nuclear ghosting, invented
-      stroma/tumor structures.
-- [ ] Check failure cases on the val slide(s) with the worst FID.
-- [ ] Blind the model labels for the preference judgement.
-- [ ] Record the grid path under `docs/qualitative_dapi2he/`.
+**Not performed.** R-007 is invalid for selection, so a blinded preference
+audit would not change the architecture decision. No qualitative claim is made.
+The R-006 grid (`docs/qualitative_dapi2he/hemit_val_compare.png`) is `ch0`
+panCK and is not a DAPI audit.
 
 ## Cost / product fit
 
@@ -57,23 +72,38 @@ checkpoint with `--num 630` before declaring a winner if the unpaired run used
 | Inference cost | Lower (1 generator) | Higher (2 generators) |
 | Hallucination risk | Lower | Higher |
 | Real-world unpaired applicability | Limited | Better |
-| Current evidence | undertrained baseline | pending R-006 |
+| Current evidence | valid but undertrained baseline | **invalid run; no valid comparison** |
 
 ## Decision
 
-_Pending._ State one of:
-- Keep paired U-Net as default; unpaired is not justified on val FID/LPIPS or
-  qualitative audit.
-- Switch to CycleGAN; state the val metric margin and the hallucination audit.
-- Neither is release quality; proceed to Stage 2.5 with the chosen architecture.
+**Keep the paired U-Net as the reverse default.** The unpaired CycleGAN did not
+produce a valid FID/LPIPS comparison, so it cannot displace the paired baseline.
+Do not spend more quota on CycleGAN or start CUT by default. The next GPU spend
+is Stage 2.5: longer 1024 paired training with val-based checkpoint selection,
+then full 630/945 evaluation and CIs. Neither current model is release quality.
+
+## Code fixes after R-007
+
+- `src/models/train_unpaired.py`: `ResnetGenerator` now ends in `Sigmoid`, so
+  its `[0,1]` output matches the `[0,1]` losses/eval. Legacy Tanh checkpoints
+  (R-006/R-007) are not valid under the fixed code.
+- `scripts/kaggle/he-dapi-cyclegan-ch2-256.py`: future evals pass
+  `--metrics fid,lpips`.
+- `src/backend/main.py`: reverse direction now serves the corrected
+  `dapi2he_ch2_1024/generator_last.pt`, not the invalid aborted
+  `dapi2he/cyclegan_G_last.pt`.
 
 ## Provenance
 
-- Git SHA at launch:
-- Code dataset / SHA-256 of `src/models/datasets.py`:
-- Kernel ref/version:
-- Config + hash:
-- Checkpoint SHA-256:
-- Val H5 + SHA-256:
-- Eval JSON:
-- Decision author/date:
+- Git SHA at launch: `d69eb65` (docs/guard edits uncommitted).
+- Code dataset: `bikasash/he-dapi-code-dapi-1024` (2026-10-23 04:53 UTC).
+- Kernel ref/version: `bikasash/he-dapi-cyclegan-ch2-256-r-007` v1.
+- Config + hash: `configs/cyclegan_hemit_dapi2he_kaggle.yaml`,
+  SHA-256 `689ebc40…e9079`.
+- Checkpoint SHA-256: `cyclegan_G_last.pt` `815023a0…9e4857`;
+  `generator_last.pt` `d5ef563e…39956f`.
+- Val H5: `hemit_val_256.h5`, `dapi = mihc[...,2]`, verified in-kernel.
+- Eval JSON: `/home/bikash/kaggle_r007_output/checkpoints/hemit_cyclegan_ch2_256/eval_cyclegan.json`
+  (FID/LPIPS null; invalid).
+- Decision author/date: coding agent, 2026-10-23 12:20 UTC; user can reopen
+  only with a valid FID/LPIPS run.

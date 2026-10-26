@@ -23,6 +23,8 @@ resources/models/checkpoints/
 logs/*.log
 logs/*.pid
 logs/*.flag
+logs/crash_reports/
+logs/CRASH_ALERT
 *.flag
 nohup.out
 # Live profiling snapshot rewritten every training step (kept on disk, not tracked)

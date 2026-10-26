@@ -51,6 +51,8 @@ class DISTSLoss(nn.Module):
         target01 = (target+1)/2 if target.min() < 0 else target
         if self._vgg is None:
             return F.l1_loss(pred01, target01)
+        if next(self._vgg.parameters()).device != pred.device:
+            self._vgg.to(pred.device)
         # VGG features
         # Normalize with ImageNet stats
         mean = torch.tensor([0.485,0.456,0.406], device=pred.device).view(1,3,1,1)

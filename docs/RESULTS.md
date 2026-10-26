@@ -4,19 +4,26 @@
 > The raw HEMIT RGB TIFF has **ch2=DAPI (blue), ch0=panCK (red), ch1=CD3
 > (green)**. The legacy 512 model is the **real DAPI** model; the 1024 `ch0`
 > forward/reverse models and R-006 are **panCK**. The 256 H5 was rebuilt on
-> `ch2`; a corrected 1024 DAPI model is still pending. See
+> `ch2`; a corrected 1024 DAPI baseline now exists but is undertrained (see
+> below). See
 > [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md). Do not use R-006 as DAPI.
 
 ## TL;DR
 
-- The only real **H&E → DAPI** baseline is the legacy 512px 200-epoch model
-  (`ch2`); it is internal, non-paper protocol, and its provenance is being
-  re-verified.
-- The epoch-199/200 checkpoints and the 1024 `ch0` run are the **panCK
-  ablation**; R-006 is also panCK. They are engineering baselines, not DAPI.
+- The only near-paper-quality **H&E → DAPI** baseline is the legacy 512px
+  200-epoch model (`ch2`); it is internal, non-paper protocol, and its
+  provenance is verified (H5 target + HF SHA match). The corrected 1024 `ch2`
+  baseline is valid but undertrained.
+- The 1024 `ch0` forward/reverse run and R-006 are the **panCK ablation**. They
+  are engineering baselines, not DAPI. Legacy `he2dapi` epoch199/200 are DAPI.
 - The 256 H5 was rebuilt on `mihc[...,2]` on 2026-10-23 and verified; the
   loader ignores the stale 1024 `dapi` cache.
-- No valid 1024 DAPI model and no valid DAPI→H&E model exist yet.
+- A corrected 1024 `ch2` baseline now exists in both directions (2026-10-23),
+  but it is **undertrained and not release quality**; the legacy 512 model
+  remains the best forward DAPI checkpoint.
+- R-007 (unpaired CycleGAN `ch2` 256) completed 12:13 UTC but is **invalid for
+  selection**: the eval omitted FID/LPIPS and used a Tanh/[0,1] mismatch. The
+  paired U-Net remains the reverse default; see `selection_reverse.md`.
 - Paper targets are listed below for orientation; they are **not** results from
   this repository.
 
@@ -87,7 +94,45 @@ legacy 512 val H5, 50 center crops:
 
 This strongly supports the audit: the legacy 512 model predicts nuclei/DAPI,
 not panCK. The full 630/945 numbers in the table above came from the same
-`ch2` target. Provenance is now recorded; re-run full splits before release.
+`ch2` target.
+
+Artifact provenance also verified: `hemit_{train,val}_512.h5["dapi"]` is
+exactly equal to `mihc[...,2]` (array-equal), and the public HF generator
+`he2dapi_unet_epoch169.pt` (SHA-256 `c87751…e2afdc`) has 46/46 tensors exactly
+equal to local `checkpoint_epoch169.pt["G"]`. Re-run full splits before release.
+
+## Corrected 1024 `ch2` baseline — both directions (2026-10-23)
+
+Run: `bikasash/he-dapi-paired-ch2-1024-both`, Kaggle T4, 14 epochs at 512 on
+the 1024 H5 (8,000 MB train, centered to 512) followed by 2 × 500 steps at
+1024, forward then reverse. Code dataset `bikasash/he-dapi-code-dapi-1024`
+updated 04:53 UTC; loader target verified as `mihc[...,2]` (MAE 0.0, corr 1.0).
+Kernel COMPLETE at 08:55 UTC, both directions exit 0. No full-split claim yet;
+all numbers are the first 50 validation crops at the listed resolution.
+
+| Run | px | FID ↓ | LPIPS ↓ | PSNR | SSIM | Pearson | L1 ↓ | Dice |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Legacy 512 DAPI (200 ep) | 512 | **146.27** | **0.2468** | **29.52** | 0.7662 | 0.5323 | **0.0221** | — |
+| Forward ch2 pretrain | 512 | 184.73 | 0.4044 | 27.54 | 0.7431 | 0.2877 | 0.0296 | 0.0381 |
+| Forward ch2 fine-tune | 1024 | 215.38 | 0.3899 | 27.91 | **0.7733** | **0.5515** | 0.0250 | 0.0828 |
+| Reverse ch2 pretrain | 512 | 372.22 | 0.5908 | 15.13 | 0.4619 | 0.6448 | 0.1613 | — |
+| Reverse ch2 fine-tune | 1024 | **282.92** | **0.5317** | **15.42** | **0.4891** | **0.6644** | **0.1505** | — |
+
+Checkpoints:
+`resources/models/checkpoints/he2dapi_ch2_1024/checkpoint_last.pt`
+(SHA-256 `78b15ef5…52ebd5`) and
+`resources/models/checkpoints/dapi2he_ch2_1024/checkpoint_last.pt`
+(SHA-256 `5f930960…a870f98`). JSON:
+`docs/metrics_ch2_1024_forward_val50.json`,
+`docs/metrics_ch2_1024_reverse_val50.json`, and the two `*_pretrain512_*` files.
+
+Interpretation: the corrected forward model is **not better than legacy 512**
+on FID/LPIPS/PSNR/L1 and has only 500 native-resolution fine-tune steps; the
+reverse model is an improvement over the invalid panCK reverse baseline on every
+reported metric but remains visibly weak (SSIM 0.489, PSNR 15.42). Neither is
+release quality. Training caveats: DISTS was disabled by a `use_dists` logic
+bug, pretrain ran at 512 on a 1024 file, and there was no val-based checkpoint
+selection.
 
 ## First 1024 baseline (panCK target — invalid for DAPI)
 
@@ -129,11 +174,12 @@ The reverse FID/LPIPS are far worse than forward, consistent with the low
 output contrast (fake std ≈ 0.09 vs real ≈ 0.18). JSON:
 `docs/metrics_dapi_1024_baseline.json`, `docs/metrics_dapi2he_1024_baseline.json`.
 
-## Forward quality pass (colour + gradient) — negative result
+## Forward quality pass (colour + gradient) — panCK `ch0`, negative result
 
 Run: `bikasash/he-dapi-he2dapi-quality-1024`, 4 epochs at 1024 (batch 1,
-grad-accum 8, lr 3e-5) seeded from the forward 1024 baseline, adding
-`color_weight=5`, `grad_weight=2` on top of the existing losses. 50 val crops:
+grad-accum 8, lr 3e-5) seeded from the **panCK `ch0`** forward 1024 baseline
+(JSON target `DAPI ch0`; not a ch2 DAPI experiment), adding `color_weight=5`,
+`grad_weight=2` on top of the existing losses. 50 val crops:
 
 | Checkpoint | px | FID ↓ | LPIPS ↓ | PSNR | SSIM | L1 ↓ |
 |---|---:|---:|---:|---:|---:|---:|
@@ -187,6 +233,50 @@ This is **not** paper-level: paper U-Net is SSIM 0.791 / Pearson 0.659.
 The val/test gap is large and likely reflects slide/domain differences plus
 limited fine-tuning. It is a plumbing baseline, not a claim of DAPI quality.
 
+## Corrected ch2 paired reverse @256 (R-007 reference)
+
+Checkpoint `resources/models/checkpoints/dapi2he_ch2_1024/checkpoint_last.pt`
+(the corrected 1024 fine-tune) evaluated on the first 50 `hemit_val_256.h5`
+crops at 256 px, 2026-10-23 09:59 UTC. This is the correct paired reference for
+the unpaired R-007 comparison:
+
+| Model | Target | FID ↓ | LPIPS ↓ | PSNR | SSIM | L1 ↓ |
+|---|---|---:|---:|---:|---:|---:|
+| Paired reverse ch2 1024 @256 | H&E | **285.29** | **0.5129** | **15.45** | **0.4772** | **0.1548** |
+
+JSON: `docs/metrics_ch2_1024_reverse_256_val50.json`. The same checkpoint at
+native **1024 px** gives FID 282.92 / LPIPS 0.5317 / SSIM 0.4891
+(`docs/metrics_ch2_1024_reverse_val50.json`); always state the resolution.
+The older `342.98 / 0.5904` reference is **ch0 panCK**; do not compare R-007
+against it. R-007 reports 630 rows, but its FID/LPIPS use the first 50
+(`eval_offline` default `metric_num=50`), matching this reference; verify
+`metric_n=50` in its JSON.
+
+## R-007 — HEMIT 256px CycleGAN (`ch2`; invalid for selection)
+
+Run: `bikasash/he-dapi-cyclegan-ch2-256-r-007` v1, 10 epochs, 929 steps/epoch,
+batch 4 × accum 2, AMP, `hemit_{train,val}_256.h5` only (`HE: 0 files + H5`,
+`synthetic=False`), `ch2` verified against `mihc[...,2]`; exit 0 at
+2026-10-23 12:13 UTC. Checkpoint `cyclegan_G_last.pt` SHA-256
+`815023a0…9e4857`.
+
+| Model | Target | FID ↓ | LPIPS ↓ | PSNR | SSIM | L1 ↓ | Pearson |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Paired reverse ch2 1024 @256 | H&E | **285.29** | **0.5129** | **15.45** | **0.4772** | **0.1548** | 0.6286 |
+| CycleGAN R-007 @256 | H&E | **null** | **null** | 8.45† | 0.2215† | 0.3449† | -0.2984† |
+
+†Invalid: the kernel eval omitted `--metrics fid,lpips`, and the generator's
+Tanh output (`[-1,1]`) was compared directly with `[0,1]` targets. A 5-crop spot
+check with correct denormalization gives PSNR 12.25 / SSIM 0.3698 / Pearson
+-0.2975, still far below the paired reference. The 10-epoch run is also
+undertrained. **R-007 is not a valid architecture verdict; paired U-Net remains
+default.** See `docs/selection_reverse.md`.
+
+Archived invalid JSON: `docs/metrics_cyclegan_ch2_256_r007_invalid.json`.
+Code fixes after the run: `ResnetGenerator` now ends in `Sigmoid`; future kernel
+evals pass `--metrics fid,lpips`. Legacy Tanh CycleGAN checkpoints are invalid
+under the fixed code.
+
 ## R-006 — HEMIT 256px CycleGAN (panCK `ch0`; invalid for DAPI)
 
 Run: `bikasash/he-dapi-cyclegan-hemit-dapi2he-256`, 10 epochs, 929
@@ -224,3 +314,60 @@ metrics are val SSIM 0.7389 / Pearson 0.5072 and test SSIM 0.7890 / Pearson
 [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md) and
 [`ABLATION_PANCK.md`](ABLATION_PANCK.md) (the latter title is now misleading;
 it documents the real DAPI run and will be renamed after approval).
+
+## Stage 2.5b — long 1024 fine-tunes (2026-10-24)
+
+Both runs: Kaggle T4, 20 epochs at 1024px, batch 1 × grad-accum 8, lr 3e-5,
+fp32, no colour/gradient losses, real-SSIM validation (`L1 + 0.25*(1-SSIM)`).
+Forward seeded from legacy 512 epoch 200; reverse seeded from the corrected
+1024 reverse baseline. All numbers are the first 50 validation crops.
+
+| Run | Best ep | FID ↓ | LPIPS ↓ | PSNR | SSIM | Pearson | L1 ↓ | Dice |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Legacy 512 DAPI | 200 | **146.27** | **0.2468** | **29.52** | 0.7662 | 0.5323 | **0.0221** | 0.1638 |
+| Forward 1024 baseline | 2 | 215.38 | 0.3899 | 27.91 | 0.7733 | 0.5515 | 0.0250 | 0.0828 |
+| **Forward 1024 Stage 2.5b** | **17** | 169.53 | 0.2706 | 28.86 | **0.7771** | **0.5851** | 0.0237 | **0.2018** |
+| Reverse 1024 baseline | 2 | 282.92 | 0.5317 | 15.42 | 0.4891 | 0.6644 | 0.1505 | — |
+| Reverse 1024 Stage 2.5 (colour/grad) | 4 | 284.27 | 0.5221 | 15.24 | 0.5024 | 0.6654 | 0.1520 | — |
+| **Reverse 1024 Stage 2.5b** | **20** | **239.18** | **0.4875** | **15.84** | **0.5181** | **0.6919** | **0.1447** | — |
+| Reverse 1024 Stage 2.5b ext | 22 | 250.35 | 0.4929 | **15.93** | 0.5082 | 0.6882 | **0.1393** | — |
+
+Interpretation:
+
+- **Forward:** the long run improves **every** metric over the 1024 baseline
+  (FID −45.85, LPIPS −0.1193, Dice +0.119) and beats legacy 512 on
+  SSIM/Pearson/Dice, but **not** on FID/LPIPS/PSNR/L1. Caveat: legacy is 512,
+  the new model is 1024; a fair 1024-vs-1024 legacy comparison is still needed.
+  Legacy 512 remains the perceptual/FID default; the new 1024 model is the
+  best high-resolution/nuclei option.
+- **Reverse:** the clean long recipe improves **every** metric over both the
+  1024 baseline and the Stage 2.5 colour/grad run. It is still far from the
+  paper target (SSIM 0.785 / PSNR 28.3) and remains visibly weak.
+- **Reverse extension (epochs 21-30):** diminishing returns. Epoch 22 improved
+  the composite val score (0.2622), L1 (0.1393) and PSNR (15.93), but worsened
+  FID (250.35 vs 239.18), LPIPS (0.4929 vs 0.4875), SSIM (0.5082 vs 0.5181)
+  and Pearson (0.6882 vs 0.6919) vs epoch 20. Keep epoch 20 as the perceptual
+  reverse default; epoch 22 is the L1/PSNR alternative. Stop extending reverse.
+- Checkpoints: forward best SHA `3850b8ba…523f72`, reverse best SHA
+  `652438e1…0fd108`; local JSONs
+  `docs/metrics_stage25b_forward_best_val50_local.json` and
+  `docs/metrics_stage25b_reverse_best_val50_local.json`.
+
+### Fair 1024 comparison — legacy 512 checkpoint run at 1024 (2026-10-25)
+
+The legacy 512 model is fully convolutional, so it can be evaluated on the same
+1024 val crops. This removes the cross-resolution caveat:
+
+| Forward model | px | FID ↓ | LPIPS ↓ | PSNR | SSIM | Pearson | L1 ↓ | Dice |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Legacy 512 @512 | 512 | 146.27 | **0.2468** | 29.52 | 0.7662 | 0.5323 | 0.0221 | 0.1638 |
+| **Legacy 512 @1024** | **1024** | **129.99** | 0.2977 | 28.25 | 0.6562 | 0.5846 | 0.0289 | **0.4315** |
+| Stage 2.5b 1024 | 1024 | 169.53 | 0.2706 | **28.86** | **0.7771** | **0.5851** | **0.0237** | 0.2018 |
+
+At the same 1024 resolution, the legacy 512 checkpoint has the **best FID
+(129.99)** and **best nuclei Dice (0.4315)**; the Stage 2.5b 1024 fine-tune
+wins LPIPS/PSNR/SSIM/L1. The fine-tune traded nuclei accuracy and perceptual
+texture for pixel fidelity. **Legacy 512 remains the forward DAPI default**;
+the 1024 fine-tune is not a replacement. Next forward work must preserve Dice
+(e.g. stronger nuclei loss, from-scratch 1024 training), not just L1/SSIM.
+JSON: `docs/metrics_legacy512_at1024_val50_local.json`.

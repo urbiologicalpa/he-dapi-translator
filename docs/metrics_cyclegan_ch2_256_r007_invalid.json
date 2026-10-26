@@ -1,0 +1,31 @@
+{
+  "checkpoint": "/kaggle/working/checkpoints/hemit_cyclegan_ch2_256/cyclegan_G_last.pt",
+  "file_epoch": 0,
+  "split": "val",
+  "direction": "dapi2he",
+  "resolution": 256,
+  "n": 630,
+  "train_G_loss": 0.0,
+  "val_L1": 0.3449,
+  "val_PSNR_dB": 8.45,
+  "val_SSIM": 0.2215,
+  "val_Pearson": -0.2984,
+  "val_SSIM_loss_proxy": 0.3536,
+  "val_Dice_thresh01": null,
+  "val_D_loss": 0.6934,
+  "val_FID": null,
+  "val_LPIPS": null,
+  "metric_n": 50,
+  "note": "SSIM/Pearson are per-image skimage/numpy; Dice thresh 0.1; D-loss ~0.69=balanced",
+  "evaluated": "2026-10-23T12:10:52.069905+00:00",
+  "label": "cyclegan-ch2-256",
+  "target": "H&E (HEMIT unpaired)",
+  "valid_for_selection": false,
+  "invalid_reason": "kernel omitted --metrics fid,lpips; Tanh output compared with [0,1] targets; 10-epoch undertrained",
+  "checkpoint_sha256": "815023a0b1d355993e79d970764dd266b65c72a23e36753ccced04102f9e4857",
+  "denorm_spot_check_5crops": {
+    "PSNR": 12.25,
+    "SSIM": 0.3698,
+    "Pearson": -0.2975
+  }
+}

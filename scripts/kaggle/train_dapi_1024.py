@@ -5,7 +5,8 @@ Stages (set DAPI_STAGE):
   smoke     - 1 epoch / 20 steps at 512, timing only
   pretrain  - 20 epochs at 512 from the 1024px Macenko HDF5
   finetune  - 2 x 500 steps at 1024 from the 512 checkpoint
-  quality   - longer 1024 fine-tune with colour+gradient losses
+  quality   - longer 1024 fine-tune with colour+gradient losses and
+              fixed-subset validation -> checkpoint_best.pt
   all       - pretrain then finetune in one kernel (no checkpoint dataset needed)
 
 Direction (set DAPI_DIRECTION):
@@ -38,6 +39,7 @@ TAG = "dapi" if DIRECTION == "he2dapi" else "dapi2he"
 PRETRAIN_EPOCHS = int(os.environ.get("DAPI_PRETRAIN_EPOCHS", "20"))
 FINETUNE_EPOCHS = int(os.environ.get("DAPI_FINETUNE_EPOCHS", "2"))
 FINETUNE_STEPS = int(os.environ.get("DAPI_FINETUNE_STEPS", "500"))
+QUALITY_EPOCHS = int(os.environ.get("DAPI_QUALITY_EPOCHS", "4"))
 ROOT = Path("/kaggle/working/he-dapi")
 CKPT_ROOT = Path("/kaggle/working/checkpoints")
 INPUT = Path("/kaggle/input")
@@ -120,8 +122,27 @@ def link_data() -> Path:
     return dst_dir / "hemit_train_1024.h5"
 
 
-def find_input_checkpoint() -> Path | None:
+def is_quality_checkpoint(path: Path) -> bool:
+    """True for a Stage 2.5/quality checkpoint, not the 1024 seed."""
+    if "stage25" in str(path).lower() or "quality" in str(path).lower():
+        return True
+    try:
+        import torch
+        ckpt = torch.load(str(path), map_location="cpu")
+        cfg = ckpt.get("config", {}) or {}
+        train_cfg = cfg.get("training", {}) or {}
+        loss_cfg = (cfg.get("model", {}) or {}).get("loss", {}) or {}
+        return bool(train_cfg.get("val_h5")) or float(loss_cfg.get("color_weight", 0) or 0) > 0
+    except Exception:
+        return False
+
+
+def find_input_checkpoint(prefer_quality: bool = False) -> Path | None:
     last = sorted(INPUT.rglob("checkpoint_last.pt"))
+    if prefer_quality:
+        for p in last:
+            if is_quality_checkpoint(p):
+                return p
     if last:
         return last[0]
     epochs: list[tuple[int, Path]] = []
@@ -168,24 +189,32 @@ def train_stage(stage: str, h5: Path) -> None:
         else:
             extra = ["--resume", "auto", "--epochs", str(FINETUNE_EPOCHS), "--max-steps", str(FINETUNE_STEPS)]
     elif stage == "quality":
-        config = ROOT / f"configs/hemit_{TAG}_quality_1024.yaml"
+        config = ROOT / os.environ.get(
+            "DAPI_QUALITY_CONFIG", f"configs/hemit_{TAG}_quality_1024.yaml"
+        )
         if not config.exists():
             print(f"FATAL missing quality config {config}")
             sys.exit(2)
-        incoming = find_input_checkpoint()
+        incoming = find_input_checkpoint(prefer_quality=True)
         starting_fresh = not any(ckpt_dir.glob("checkpoint_*.pt"))
         if starting_fresh:
             if not incoming:
                 print("FATAL quality stage needs a 1024 checkpoint")
                 sys.exit(2)
             shutil.copy2(incoming, ckpt_dir / "checkpoint_last.pt")
-            print(f"initialized quality run from {incoming}")
-            # Seed weights but restart the epoch counter so the full quality
-            # schedule (4 epochs at the lower LR) actually runs.
-            extra = ["--resume", str(ckpt_dir / "checkpoint_last.pt"),
-                     "--resume-epoch", "0", "--epochs", "4"]
+            if is_quality_checkpoint(incoming):
+                print(f"resuming quality run from {incoming}")
+                # Keep the epoch counter so the next epochs continue.
+                extra = ["--resume", str(ckpt_dir / "checkpoint_last.pt"),
+                         "--epochs", str(QUALITY_EPOCHS)]
+            else:
+                print(f"initialized quality run from seed {incoming}")
+                # Seed weights but restart the epoch counter so the full
+                # quality schedule runs from epoch 1.
+                extra = ["--resume", str(ckpt_dir / "checkpoint_last.pt"),
+                         "--resume-epoch", "0", "--epochs", str(QUALITY_EPOCHS)]
         else:
-            extra = ["--resume", "auto", "--epochs", "4"]
+            extra = ["--resume", "auto", "--epochs", str(QUALITY_EPOCHS)]
     else:
         raise SystemExit(f"unknown stage={stage}")
 

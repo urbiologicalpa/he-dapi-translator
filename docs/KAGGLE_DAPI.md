@@ -6,9 +6,12 @@
 > `mihc[...,2]` (`ch2`), the rebuilt 256 H5, and new `-ch2-` Kaggle datasets
 > (not yet uploaded). See [`CHANNEL_AUDIT.md`](CHANNEL_AUDIT.md).
 
-Last checked: **2026-10-22 06:03 UTC**
+Last checked: **2026-10-23 12:45 UTC**
 
-## 2026-10-23 corrected ch2 run (active)
+## 2026-10-23 corrected ch2 run (complete; Stage 2.5 prepared)
+
+Stage 2.5 (longer reverse 1024 paired run with val-based selection) is staged
+but **not launched**; see §5a and [`LIVE_STATE.md`](LIVE_STATE.md) §0.6.
 
 - Kernel: `bikasash/he-dapi-paired-ch2-1024-both` v1 (T4, private).
 - Data: `bikasash/hemit-dapi-1024-ch0-macenko` (payload name historical;
@@ -276,32 +279,33 @@ Kaggle test eval, attach `bikasash/hemit-dapi-1024-ch0-test` plus the checkpoint
 dataset, copy both into `/kaggle/working`, and run the same command with the
 mounted H5 path.
 
-### 5a. Quality, unpaired and CPU eval kernels
+### 5a. Quality and eval kernels (current)
 
-| Kernel | Purpose | GPU | Sources |
-|---|---|---|---|
-| `bikasash/he-dapi-dapi2he-quality-1024` | reverse quality fine-tune | yes | data, code, `he-dapi-dapi2he-finetune-ckpt` |
-| `bikasash/he-dapi-he2dapi-quality-1024` | forward quality fine-tune | yes | data, code, `he-dapi-dapi-finetune-ckpt` |
-| `bikasash/he-dapi-cyclegan-dapi2he-1024` | unpaired CycleGAN | yes | data, `mhist-he-256`, code |
-| `bikasash/he-dapi-*-quality-eval-cpu` | FID/LPIPS on kernel output | no | data, code, `kernel_sources: <train kernel>` |
+| Kernel | Purpose | GPU | Internet | Sources |
+|---|---|---|---|---|
+| `bikasash/he-dapi-paired-stage25-reverse` | Stage 2.5 reverse quality fine-tune | yes | off | data, code, seed |
+| `bikasash/he-dapi-paired-stage25-eval` | best/last FID+LPIPS val/test eval | yes | on | data, code, `kernel_sources: he-dapi-paired-stage25-reverse` |
 
-The quality kernels use `train_dapi_quality.py` with `STAGE="quality"` and
-`DIRECTION` set to `dapi2he` or `he2dapi`; configs are
-`configs/hemit_{dapi2he,dapi}_quality_1024.yaml`. The unpaired kernel runs
-`train_unpaired.py` (`configs/cyclegan_dapi2he.yaml`) with MHIST H&E (256px) as
-the external domain and evaluates the last generator on `hemit_val_1024.h5`.
-Kaggle allows two concurrent GPU sessions: queue the unpaired kernel after a
-quality kernel finishes.
+Stage 2.5 uses `scripts/kaggle/train_dapi_1024.py` with `DAPI_STAGE=quality`
+and `DAPI_DIRECTION=dapi2he`. The config is
+`configs/hemit_dapi2he_quality_1024.yaml`; it runs 4 epochs at 1024, saves
+`checkpoint_best.pt`/`generator_best.pt` from a fixed 50-crop validation
+(`val_L1 + 0.25*(1-val_SSIM)`), and keeps `checkpoint_last.pt`. The eval kernel
+runs `scripts/kaggle/eval_dapi_1024.py` with
+`--metrics fid,lpips --metric-num 50`; it evaluates both best and last on val
+and the selected checkpoint on test.
 
-The CPU eval kernels (`scripts/kaggle/eval_checkpoint.py`) depend on the
-training kernel via `kernel_sources`, enable internet for Inception/LPIPS
-weights, and write `/kaggle/working/metrics_eval.json`.
+Staged locally (not uploaded) under
+`/home/bikash/kaggle_stage/stage25_{code,seed,kernel,eval}/`. The old
+`he-dapi-dapi2he-quality-1024` / `he2dapi-quality-1024` rows are historical and
+are not the current Stage 2.5 run. The unpaired CycleGAN path is closed after
+R-007 (invalid for selection); do not relaunch it by default.
 
 ## Tracking table
 
 | Stage | Status | Notes |
 |---|---|---|
-| Local panCK epoch 200 | done | full 630/945 len eval recorded |
+| Local legacy DAPI epoch 200 | done | full 630/945 eval recorded; re-verified as `ch2` DAPI |
 | Build 1024 H5 | done | train 11.5 GB, val 2.1 GB, test 3.0 GB |
 | Upload data dataset | ready (train/val) | test split in separate dataset |
 | Upload code dataset | ready | nested `code_bundle/` mount handled |

@@ -7,9 +7,13 @@ while true; do
     exit 0
   fi
   if ! pgrep -f "train_paired.*hemit_dual_branch" > /dev/null 2>&1; then
-    echo "[KEEPALIVE $(date -u +%Y-%m-%dT%H:%M:%SZ)] TRAIN DEAD -> relaunching epoch resume auto" >> logs/keepalive.log
-    nohup nice -n 10 env PYTHONPATH=. .venv/bin/python -u -m src.models.train_paired --config configs/hemit_dual_branch.yaml --resume auto --optimize-for lowram >> logs/train_paired.log 2>&1 < /dev/null 9>&- &
-    echo "[KEEPALIVE] new PID $!" >> logs/keepalive.log
+    if bash scripts/crash_guard.sh --preflight >> logs/crash_guard.log 2>&1; then
+      echo "[KEEPALIVE $(date -u +%Y-%m-%dT%H:%M:%SZ)] TRAIN DEAD -> relaunching epoch resume auto" >> logs/keepalive.log
+      nohup nice -n 10 env PYTHONPATH=. .venv/bin/python -u -m src.models.train_paired --config configs/hemit_dual_branch.yaml --resume auto --optimize-for lowram >> logs/train_paired.log 2>&1 < /dev/null 9>&- &
+      echo "[KEEPALIVE] new PID $!" >> logs/keepalive.log
+    else
+      echo "[KEEPALIVE $(date -u +%Y-%m-%dT%H:%M:%SZ)] BLOCKED by crash_guard preflight -> not relaunching" >> logs/keepalive.log
+    fi
   fi
   if ! pgrep -f "watch_runs.sh" > /dev/null 2>&1; then
     echo "[KEEPALIVE $(date -u +%Y-%m-%dT%H:%M:%SZ)] WATCH DEAD -> relaunching watch_runs.sh (300s week-mode)" >> logs/keepalive.log

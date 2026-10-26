@@ -1,0 +1,59 @@
+# DAPI -> H&E long 1024px fine-tune (Stage 2.5b reverse control).
+# Seeded from the corrected 1024 reverse baseline. No colour/gradient losses
+# (the Stage 2.5 colour/grad recipe is under evaluation); paper-aligned LR,
+# 20 epochs, real-SSIM val-based best-checkpoint selection. Nuclei Dice is off
+# because the target is RGB H&E, not a nuclei mask.
+data:
+  name: hemit
+  root: data/raw/hemit
+  processed: data/processed/hemit_train_1024.h5
+  patch_size: 1024
+  split: [3717, 630, 945]
+  stain_norm: none
+  augment: false
+  lowram_subset: null
+  direction: dapi2he
+
+model:
+  name: pix2pix_unet
+  generator:
+    arch: unet
+    ngf: 64
+  discriminator:
+    arch: patchgan
+    ndf: 64
+    n_layers: 3
+  loss:
+    gan_weight: 1.0
+    l1_weight: 50.0
+    ssim_weight: 10.0
+    dists_weight: 0.0
+    nuclei_aux_weight: 0.0
+    color_weight: 0.0
+    grad_weight: 0.0
+
+training:
+  epochs: 20
+  batch_size: 1
+  grad_accum: 8
+  num_workers: 2
+  lr: 0.00003
+  beta1: 0.5
+  mixed_precision: false
+  precision: fp32
+  dists_on_cpu: false
+  checkpoint_dir: resources/models/checkpoints/dapi2he_quality_1024
+  save_every: 1
+  resume: auto
+  export_onnx: false
+  oom_guard: true
+  max_cache_mb: 16
+  # Fixed 50-crop val subset for best-checkpoint selection. Score is
+  # L1 + 0.25*(1 - SSIM_skimage); lower is better.
+  val_h5: data/processed/hemit_val_1024.h5
+  val_num: 50
+  val_every: 1
+
+experiment:
+  tracker: none
+  project: he-dapi-translator

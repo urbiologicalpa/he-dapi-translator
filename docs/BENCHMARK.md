@@ -83,7 +83,8 @@ Separate table. Label outputs **predicted H&E-like**, not H&E.
 
 ## Artifact naming
 
-- `docs/metrics_panck_512.json` — legacy 200-epoch ablation.
+- `docs/metrics_panck_512.json` — legacy 200-epoch **DAPI** baseline
+  (historical filename; label corrected 2026-10-23).
 - `docs/metrics_dapi_<res>_<method>.json` — corrected DAPI runs.
 - `docs/metrics_reverse_<method>.json` — reverse runs.
 

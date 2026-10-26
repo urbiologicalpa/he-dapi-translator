@@ -62,11 +62,52 @@ def install_code(code: Path) -> None:
     raise SystemExit(f"code root has no source: {code}")
 
 
-def find_one(pattern: str) -> Path:
+def find_one_optional(pattern: str) -> Path | None:
     matches = sorted(INPUT.rglob(pattern))
-    if not matches:
+    return matches[0] if matches else None
+
+
+def find_one(pattern: str) -> Path:
+    path = find_one_optional(pattern)
+    if path is None:
         raise SystemExit(f"missing {pattern} under /kaggle/input")
-    return matches[0]
+    return path
+
+
+def _checkpoint_epoch(path: Path) -> int | None:
+    try:
+        import torch
+
+        ckpt = torch.load(str(path), map_location="cpu", weights_only=False)
+        epoch = ckpt.get("epoch")
+        return int(epoch) if epoch is not None else None
+    except Exception:
+        return None
+
+
+def find_checkpoints() -> list[tuple[str, Path]]:
+    """Prefer best-selected checkpoints; fall back to last.
+
+    ``checkpoint_best.pt`` and ``checkpoint_last.pt`` are often the same epoch
+    (best == last). Evaluating both doubles GPU time, so skip ``last`` when it
+    holds the same epoch.
+    """
+    found: list[tuple[str, Path]] = []
+    best = sorted(INPUT.rglob("checkpoint_best.pt"))
+    last = sorted(INPUT.rglob("checkpoint_last.pt"))
+    if best:
+        found.append(("best", best[0]))
+    if last:
+        best_epoch = _checkpoint_epoch(best[0]) if best else None
+        last_epoch = _checkpoint_epoch(last[0])
+        same_epoch = best_epoch is not None and best_epoch == last_epoch
+        if not same_epoch:
+            found.append(("last", last[0]))
+        else:
+            print(f"checkpoint last == best epoch ({last_epoch}); skipping duplicate eval")
+    if not found:
+        raise SystemExit("missing checkpoint_best.pt / checkpoint_last.pt under /kaggle/input")
+    return found
 
 
 def main() -> None:
@@ -76,28 +117,37 @@ def main() -> None:
         raise SystemExit("no code dataset found")
     install_code(code)
 
-    ckpt = find_one("checkpoint_last.pt")
-    print("checkpoint", ckpt, f"{ckpt.stat().st_size / 1e6:.1f} MB")
+    checkpoints = find_checkpoints()
+    for tag, ckpt in checkpoints:
+        print("checkpoint", tag, ckpt, f"{ckpt.stat().st_size / 1e6:.1f} MB")
 
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT)
     results = {}
-    for split, num in (("val", 630), ("test", 945)):
-        h5 = find_one(f"hemit_{split}_1024.h5")
-        out = OUT / f"metrics_{TAG}_1024_{split}.json"
-        cmd = [
-            sys.executable, "-u", "-m", "src.models.eval_offline",
-            "--checkpoint", str(ckpt), "--h5", str(h5), "--split", split,
-            "--num", str(num), "--patch-size", "1024",
-            "--target", "DAPI ch2" if DIRECTION == "he2dapi" else "H&E RGB",
-            "--label", f"{TAG}-1024-unet",
-            "--direction", DIRECTION,
-            "--out", str(out),
-        ]
-        result = subprocess.run([str(c) for c in cmd], cwd=str(ROOT), env=env)
-        if result.returncode:
-            raise SystemExit(f"eval {split} failed: {result.returncode}")
-        results[split] = json.loads(out.read_text())
+    for ckpt_tag, ckpt in checkpoints:
+        # Run test only for the selected checkpoint (or last when no best).
+        for split, num in (("val", 630), ("test", 945)):
+            if split == "test" and ckpt_tag != checkpoints[0][0]:
+                continue
+            h5 = find_one_optional(f"hemit_{split}_1024.h5")
+            if h5 is None:
+                print(f"[EVAL] skip {split}: hemit_{split}_1024.h5 not attached")
+                continue
+            out = OUT / f"metrics_{TAG}_1024_{split}_{ckpt_tag}.json"
+            cmd = [
+                sys.executable, "-u", "-m", "src.models.eval_offline",
+                "--checkpoint", str(ckpt), "--h5", str(h5), "--split", split,
+                "--num", str(num), "--patch-size", "1024",
+                "--metric-num", "50", "--metrics", "fid,lpips",
+                "--target", "DAPI ch2" if DIRECTION == "he2dapi" else "H&E RGB",
+                "--label", f"{TAG}-1024-unet-{ckpt_tag}",
+                "--direction", DIRECTION,
+                "--out", str(out),
+            ]
+            result = subprocess.run([str(c) for c in cmd], cwd=str(ROOT), env=env)
+            if result.returncode:
+                raise SystemExit(f"eval {ckpt_tag} {split} failed: {result.returncode}")
+            results[f"{ckpt_tag}_{split}"] = json.loads(out.read_text())
     print(json.dumps(results, indent=2))
 
 

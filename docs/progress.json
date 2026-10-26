@@ -1,18 +1,21 @@
 {
   "project": "he-dapi-translator",
-  "updated": "2026-10-23T04:57:00Z",
-  "status": "IN_PROGRESS: ADR-014 accepted; ch2 DAPI data rebuilt/verified; 1024 ch0 and R-006 remain panCK; legacy 512 DAPI provenance next",
-  "overall_percent": 50,
+  "updated": "2026-10-25T04:50:00Z",
+  "status": "STAGE25B_REVERSE_EXT_COMPLETE_EVALUATED; REVERSE_DIMINISHING_RETURNS",
+  "overall_percent": 56,
   "machine": {
     "cpu": "Intel i5-10210U 8vCPU 4c/8t",
     "ram_gb": 3.7,
     "swap_gb": 1.0,
     "gpu": null,
     "kaggle_gpu": "2x Tesla T4 15.64GB (verified 2026-10-20)",
-    "disk_free_gb": 818,
+    "disk_free_gb": 9.9,
     "budget_per_process_gb": 1.5,
     "spike_threshold_mb": 500,
-    "wsi_canvas_budget_mb": 512
+    "wsi_canvas_budget_mb": 512,
+    "disk_note": "Windows C: 9898MB free at 12:41 UTC; fluctuates ~5-12GB as the Windows pagefile resizes. Preflight gates launches/pulls at 8192MB.",
+    "ext4_vhdx_gb": 155.4,
+    "ext4_vhdx_note": "155.4GiB logical; the vhdx file still reports ~156GB allocated and has not been compacted. Deleting inside WSL does not shrink it; compaction needs a Windows shutdown + diskpart/Optimize-VHD."
   },
   "critical_correction": {
     "date": "2026-10-23",
@@ -40,11 +43,47 @@
         "data/processed/hemit_test_256.h5",
         "data/processed/hemit_train_256.h5"
       ],
-      "invalid_backups": [
-        "data/processed/hemit_{train,val,test}_256_ch0_invalid.h5"
-      ],
+      "invalid_backups": [],
       "completed_utc": "2026-10-23T04:35:46Z",
-      "verified": "dapi == mihc[...,2] center crop; attrs dapi_channel=2; tests 51 passed/1 skipped"
+      "verified": "dapi == mihc[...,2] center crop; attrs dapi_channel=2; tests 51 passed/1 skipped",
+      "invalid_backups_removed_utc": "2026-10-23T10:37:00Z"
+    },
+    "corrected_ch2_1024": {
+      "status": "complete_valid_undertrained",
+      "kernel": "bikasash/he-dapi-paired-ch2-1024-both",
+      "completed_utc": "2026-10-23T08:55:00Z",
+      "checkpoints": {
+        "forward": "resources/models/checkpoints/he2dapi_ch2_1024/checkpoint_last.pt",
+        "forward_sha256": "78b15ef57ef62555bcb645acca501340d6dd56348f4b17681a3b2e273952ebd5",
+        "reverse": "resources/models/checkpoints/dapi2he_ch2_1024/checkpoint_last.pt",
+        "reverse_sha256": "5f930960c6fd5a0adb3beb40e1a4d1d1d239e24908b7d38c2012af8cba870f98"
+      },
+      "val50_forward": {
+        "resolution": 1024,
+        "FID": 215.38,
+        "LPIPS": 0.3899,
+        "PSNR": 27.91,
+        "SSIM": 0.7733,
+        "Pearson": 0.5515,
+        "L1": 0.025,
+        "Dice": 0.0828
+      },
+      "val50_reverse": {
+        "resolution": 1024,
+        "FID": 282.92,
+        "LPIPS": 0.5317,
+        "PSNR": 15.42,
+        "SSIM": 0.4891,
+        "Pearson": 0.6644,
+        "L1": 0.1505
+      },
+      "caveats": [
+        "only 500 fine-tune steps at 1024",
+        "512px pretrain on a 1024px H5",
+        "DISTS disabled by use_dists logic bug",
+        "no val-based checkpoint selection",
+        "50-crop eval only; full 630/945 pending"
+      ]
     },
     "legacy_dapi_reverified": {
       "checkpoint_sha256": "6789d7d244cc6ac93dffd98a30ed2c17498aa7ee6081560dedac5173b44042aa",
@@ -55,7 +94,28 @@
       "SSIM": 0.7662,
       "Pearson": 0.5323,
       "L1": 0.0221,
-      "json": "docs/metrics_dapi_512_legacy_val50.json"
+      "json": "docs/metrics_dapi_512_legacy_val50.json",
+      "h5_target": "dapi == mihc[...,2] (array-equal, train+val, verified 2026-10-23)",
+      "hf_file": "urbiologicalpa/he-dapi-translator/he2dapi_unet_epoch169.pt",
+      "hf_sha256": "c87751bbcdf2e80c43a691e4d576f0ece73cdc3b1414acd789a1d9b96ae2afdc",
+      "hf_tensor_match": "46/46 generator tensors equal to checkpoint_epoch169.pt[\"G\"]",
+      "status": "verified",
+      "epoch169": {
+        "json": "docs/metrics_dapi_512_legacy_epoch169_val50.json",
+        "FID": 161.91,
+        "LPIPS": 0.2745,
+        "PSNR": 29.85,
+        "SSIM": 0.7979,
+        "Pearson": 0.4999,
+        "L1": 0.021,
+        "note": "HF published generator; 50 val crops, 512px"
+      },
+      "artifact_alignment": {
+        "status": "mismatch",
+        "hf": "epoch169 (c87751...)",
+        "api_docker_local": "epoch200 generator_last.pt (849697...)",
+        "action": "publish epoch200 and update WEIGHT_FILES, or pin epoch169 everywhere, before v0.2.0"
+      }
     }
   },
   "phases": [
@@ -87,8 +147,8 @@
     {
       "id": 2,
       "name": "Modeling",
-      "status": "BLOCKED_AUDIT",
-      "percent": 60,
+      "status": "IN_PROGRESS",
+      "percent": 80,
       "artifacts": [
         "src/models/train_paired.py (U-Net baseline, bidirectional)",
         "src/models/train_unpaired.py (CycleGAN, H5-authoritative)",
@@ -98,7 +158,7 @@
         "data/processed/hemit_{train,val,test}_256.h5 (derived)",
         "Kaggle T4 verified"
       ],
-      "optimization": "GPU: batch 4 x accum 2, AMP; local: batch 1 x accum 8, workers 0, grad checkpoint, cgroup 2.5G"
+      "optimization": "Paired U-Net selected; Stage 2.5 reverse complete; Stage 2.5b forward long run launched 2026-10-24 03:10 UTC"
     },
     {
       "id": 3,
@@ -111,7 +171,7 @@
         "packages/he-dapi",
         "packages/napari-he-dapi"
       ],
-      "optimization": "tiled inference; 429 RAM guard"
+      "optimization": "tiled inference; 429 RAM guard; backend reverse serves corrected dapi2he_ch2_1024 generator; /models reports real SHA"
     },
     {
       "id": 4,
@@ -139,10 +199,14 @@
     }
   ],
   "next_actions": [
-    "Decide whether to launch a corrected ch2 DAPI\u2192H&E run with the remaining Kaggle quota (~6h)",
-    "If yes: upload rebuilt 256 ch2 H5 or rebuild a -ch2- Kaggle dataset, then run paired/CycleGAN",
-    "Rotate the exposed Kaggle token",
-    "Re-run full 630/945 legacy DAPI eval only if needed for release provenance"
+    "Reverse: stop extending; keep epoch 20 as perceptual default (FID/LPIPS/SSIM/Pearson) and epoch 22 as L1/PSNR alternative",
+    "Forward: legacy 512 remains default (best FID 129.99 + Dice 0.4315 at 1024); next forward work must preserve Dice (stronger nuclei loss / from-scratch 1024), not another L1/SSIM fine-tune",
+    "Run full val 630 + test 945 with bootstrap CIs on the selected forward/reverse checkpoints",
+    "Upload hemit_test_1024.h5 to Kaggle before the release test gate",
+    "Pathologist qualitative review of reverse outputs (SSIM ~0.51 / PSNR ~15.9 is still weak)",
+    "Host: compact WSL ext4.vhdx from Windows (requires wsl --shutdown) to reclaim ~50GB on C:; C: now 37GB free after cache cleanup",
+    "Align HF/API/Docker checkpoint SHA before v0.2.0; ask before publishing",
+    "Rotate exposed Kaggle token"
   ],
   "daily_log": [
     {
@@ -172,13 +236,179 @@
     {
       "date": "2026-10-23",
       "note": "Accepted ADR-014 (ch2=DAPI). Corrected packers, crop script, loader precedence, tests, and configs. Rebuilding 256 H5 from mihc[...,2]; old ch0 derivatives quarantined. R-006 and 1024 ch0 remain panCK-only."
+    },
+    {
+      "date": "2026-10-23",
+      "note": "Corrected ch2 1024 both-direction Kaggle run complete (04:54-08:55 UTC, exit 0). Verified loader reads mihc[...,2]. First valid DAPI->H&E baseline; forward 50-crop FID 215.38/SSIM 0.7733, reverse FID 282.92/SSIM 0.4891. Both undertrained; output pulled to /home/bikash/kaggle_ch2_output and canonical checkpoints copied into resources/models/checkpoints/*_ch2_1024."
+    },
+    {
+      "date": "2026-10-23",
+      "note": "WSL VM terminated at 09:30 UTC: Windows C: full (256MB free), ext4.vhdx 155.4GiB could not grow; ENOSPC left one 0-byte epoch checkpoint. Canonical ch2 checkpoints verified intact. Added scripts/crash_guard.sh + cron heartbeat/boot forensics and fenced all launchers. R-007 staged; blocked until host disk is recovered."
+    },
+    {
+      "date": "2026-10-23",
+      "note": "Host recovered at 10:37 UTC: removed 53.1GB verified WSL duplicates/archives/caches and 5.2GB Windows safe caches; C: 0.25->12.07GB, preflight SAFE; no checkpoints/extracted data touched. Pushed R-007 v1 as bikasash/he-dapi-cyclegan-ch2-256-r-007 at 10:38 UTC; RUNNING; monitor logs/kaggle_r007_monitor.sh."
+    },
+    {
+      "date": "2026-10-23",
+      "note": "Legacy 512 provenance verified: hemit_{train,val}_512.h5 dapi == mihc[...,2] (array-equal); HF he2dapi_unet_epoch169.pt SHA c87751... matches local checkpoint_epoch169 G tensor-for-tensor. Corrected metrics_panck_512* labels to DAPI; ABLATION_PANCK body corrected. Package smoke: he_dapi.translate on val[0] -> 512x512 uint8, SHA a614e882... ."
+    },
+    {
+      "date": "2026-10-23",
+      "note": "Product smoke: backend /models now reports actual checkpoint SHA; reverse direction switched from invalid aborted dapi2he/cyclegan_G_last.pt to corrected dapi2he_ch2_1024/generator_last.pt (SHA 1e9bbf2b...). Forward/reverse one-tile inference verified on val[0]. Tests 43 passed, 3 deselected."
+    },
+    {
+      "date": "2026-10-23",
+      "note": "R-007 completed 12:13 UTC (10/10 epochs, exit 0) but invalid for selection: eval omitted --metrics fid,lpips and Tanh output was compared with [0,1] targets. Raw PSNR 8.45/SSIM 0.2215; denorm 5-crop PSNR 12.25/SSIM 0.3698 vs paired 15.45/0.4772. Paired U-Net selected; Stage 2.5 after quota reset. Fixed ResnetGenerator to Sigmoid, kernel metrics flag, and backend reverse checkpoint. Tests 43 passed, 3 deselected."
+    },
+    {
+      "date": "2026-10-23",
+      "note": "Stage 2.5 prepared and launched: train_paired.py validate() + best-checkpoint saves, DISTS device/gate fix, eval best/last with --metrics fid,lpips --metric-num 50; config 4 epochs 1024, colour/gradient losses, 50-crop val selection. Uploaded private code/seed datasets and pushed bikasash/he-dapi-paired-stage25-reverse v1 at 12:56 UTC; RUNNING, resumable. Preflight SAFE (C: 9898MB, SwapFree 895MB); tests 44 passed, 3 deselected."
+    },
+    {
+      "date": "2026-10-24",
+      "note": "Host rebooted 02:50 UTC (no checkpoint loss; preflight SAFE). Pulled Stage 2.5 reverse output (518 MB): 4/4 epochs, best==last==epoch4, training val L1 0.1520 / proxy 0.2225 / PSNR 15.24. Fixed validate() to use real skimage SSIM (old SSIMLoss reported 1-SSIM and inverted best selection) and eval to skip a missing test split + dedupe best==last; tests 45 passed, 3 deselected. Created legacy-512 seed dataset and launched bikasash/he-dapi-paired-stage25b-forward (20 ep, lr 3e-5, no colour/grad, nuclei Dice) plus the reverse eval kernel."
+    },
+    {
+      "date": "2026-10-24",
+      "note": "Host rebooted 02:50 UTC; no checkpoint loss. Stage 2.5 reverse output pulled. Found and fixed validate() SSIM bug (SSIMLoss used as SSIM) and resume-direction check. Kaggle eval kernel hung ~55 min on FID/LPIPS weight download; cancelled and evaluated locally: Stage 2.5 reverse best FID 284.27/LPIPS 0.5221/SSIM 0.5024/PSNR 15.24 vs baseline 282.92/0.5317/0.4891/15.42 (mixed). Launched Stage 2.5b forward (legacy 512 seed, 20 ep) and Stage 2.5b reverse control (20 ep)."
+    },
+    {
+      "date": "2026-10-24",
+      "note": "Stage 2.5b forward COMPLETE 13:12 UTC (20/20 epochs). Best epoch 17: val L1 0.0237 / SSIM 0.7771 / PSNR 28.86 / Pearson 0.5851 / Dice 0.2018. Local FID 169.53 / LPIPS 0.2706. Beats the 1024 ch2 baseline on every metric (FID -45.85, LPIPS -0.1193, Dice +0.119) but not legacy 512 on FID/LPIPS/PSNR/L1; beats legacy on SSIM/Pearson/Dice. Cross-resolution caveat. Output pulled; reverse still running."
+    },
+    {
+      "date": "2026-10-25",
+      "note": "Stage 2.5b reverse COMPLETE 14:48 UTC (20/20). Best epoch 20: L1 0.1447 / SSIM 0.5181 / PSNR 15.84 / Pearson 0.6919. Local FID 239.18 / LPIPS 0.4875. Beats the 1024 reverse baseline (282.92/0.5317/0.4891/15.42) and the colour/grad Stage 2.5 (284.27/0.5221/0.5024/15.24) on every metric. Still far from paper target; best at final epoch -> longer clean run is the next lever."
+    },
+    {
+      "date": "2026-10-25",
+      "note": "Fair 1024 comparison: legacy 512 checkpoint run at 1024 has FID 129.99 / Dice 0.4315 vs Stage 2.5b 1024 FID 169.53 / Dice 0.2018. Legacy wins FID and nuclei Dice; Stage 2.5b wins LPIPS/PSNR/SSIM/L1. Legacy remains forward default. Documented context/token management rules in AGENTS.md."
+    },
+    {
+      "date": "2026-10-26",
+      "note": "Launched Stage 2.5b reverse extension (10 epochs, seed epoch-20 best, SHA 652438e1...). Kernel bikasash/he-dapi-paired-stage25b-reverse-ext RUNNING; monitor PID 46882. Preflight SAFE after clearing browser caches."
+    },
+    {
+      "date": "2026-10-26",
+      "note": "Stage 2.5b reverse extension COMPLETE 09:53 UTC (epochs 21-30). Best epoch 22 score 0.2622 (L1 0.1393/SSIM 0.5082/PSNR 15.93), beating seed epoch 20 (0.2651); epochs 23-30 did not improve. Output pull deferred: C: free 4.4GB < 8.2GB gate. Checkpoints safe on Kaggle."
+    },
+    {
+      "date": "2026-10-26",
+      "note": "Reverse extension local eval: FID 250.35 / LPIPS 0.4929 / PSNR 15.93 / SSIM 0.5082 / L1 0.1393. Mixed: epoch 22 wins composite/L1/PSNR, but seed epoch 20 still wins FID/LPIPS/SSIM/Pearson. Stop extending reverse. Freed 33GB on C: by clearing Windows Update/temp/CBS/crash caches; no training data touched."
     }
   ],
+  "stage25": {
+    "status": "complete_4ep",
+    "direction": "dapi2he",
+    "launched_utc": "2026-10-23T12:56:00Z",
+    "kernel_version": 1,
+    "kernel_status": "COMPLETE",
+    "datasets": [
+      "bikasash/he-dapi-code-stage25",
+      "bikasash/he-dapi-dapi2he-ch2-1024-seed",
+      "bikasash/hemit-dapi-1024-ch0-macenko"
+    ],
+    "output_dir": "/kaggle/working/checkpoints/dapi2he_quality",
+    "seed": "resources/models/checkpoints/dapi2he_ch2_1024/checkpoint_last.pt",
+    "seed_sha256": "5f930960c6fd5a0adb3beb40e1a4d1d1d239e24908b7d38c2012af8cba870f98",
+    "config": "configs/hemit_dapi2he_quality_1024.yaml",
+    "epochs": 4,
+    "batch_size": 1,
+    "grad_accum": 8,
+    "lr": 3e-05,
+    "loss_weights": {
+      "gan": 3.0,
+      "l1": 50.0,
+      "ssim": 10.0,
+      "color": 20.0,
+      "grad": 25.0,
+      "dists": 0.0
+    },
+    "val": {
+      "h5": "data/processed/hemit_val_1024.h5",
+      "num": 50,
+      "every": 1,
+      "score": "val_L1 + 0.25*(1-val_SSIM)"
+    },
+    "staging": {
+      "code": "/home/bikash/kaggle_stage/stage25_code",
+      "seed": "/home/bikash/kaggle_stage/stage25_seed",
+      "train_kernel": "/home/bikash/kaggle_stage/stage25_kernel",
+      "eval_kernel": "/home/bikash/kaggle_stage/stage25_eval"
+    },
+    "kernels": {
+      "train": "bikasash/he-dapi-paired-stage25-reverse",
+      "eval": "bikasash/he-dapi-paired-stage25-eval"
+    },
+    "expected_gpu_hours": 2.7,
+    "resume_after": "2026-10-24T00:00:00Z quota reset; pull output, create resume dataset, re-push",
+    "tests": "45 passed, 3 deselected",
+    "preflight_utc": "2026-10-23T12:41:22Z",
+    "c_free_mb": 9898,
+    "swap_free_mb": 894,
+    "completed_utc": "2026-10-23T15:00:00Z",
+    "epochs_completed": 4,
+    "training_val_last": {
+      "l1": 0.152,
+      "ssim_loss_proxy": 0.2225,
+      "psnr": 15.24,
+      "score": 0.3463,
+      "n": 50,
+      "note": "ssim_loss_proxy is 1-SSIM/cosine proxy, NOT real SSIM"
+    },
+    "best_equals_last_epoch": 3,
+    "best_last_g_sha16": "a3afeab770e5ae67",
+    "checkpoint_sha256": {
+      "best": "53c8d3e5a641c8761cb44271cf6bff7598103f388dceb1fd4231ad4a1adf4990",
+      "last": "98b74b762bb03578860a40798d55cc2ffde09dcc73efd2f3b30b46d40c0abac6",
+      "epoch4": "d77e5c9382758da44f5f4c63540abeb480bb94f125ab5d57409286d5d4e41eb6",
+      "generator_best": "2090dc460c0d50de9fc1f838dfc2e32414e90ce0c7eb00f86952b1e44e6bd06c",
+      "generator_last": "455acdfca8a87679670c305736f0f6284f6d87b48a8d7ed7a20410d0415e17be"
+    },
+    "output_pulled": "/home/bikash/kaggle_out_stage25_reverse",
+    "output_pulled_utc": "2026-10-24T03:00:00Z",
+    "output_size_mb": 518,
+    "eval_kernel": "bikasash/he-dapi-paired-stage25-eval",
+    "eval_status": "cancelled_2026-10-24T03:52Z_after_hanging_on_fid_lpips_weight_download; local eval used",
+    "eval_scope": "val 630 + FID/LPIPS on 50 crops; test skipped (no test H5 attached)",
+    "bug_fixed_utc": "2026-10-24T03:05:00Z",
+    "bug": "validate() used SSIMLoss (1-SSIM or cosine proxy) as SSIM and the score L1+0.25*(1-proxy) inverted best-checkpoint selection",
+    "eval_local": {
+      "checkpoint": "/home/bikash/kaggle_out_stage25_reverse/checkpoints/dapi2he_quality/checkpoint_best.pt",
+      "file_epoch": 4,
+      "n": 50,
+      "resolution": 1024,
+      "FID": 284.27,
+      "LPIPS": 0.5221,
+      "PSNR": 15.24,
+      "SSIM": 0.5024,
+      "Pearson": 0.6654,
+      "L1": 0.152,
+      "D_loss": 1.0466,
+      "baseline_FID": 282.92,
+      "baseline_LPIPS": 0.5317,
+      "baseline_PSNR": 15.42,
+      "baseline_SSIM": 0.4891,
+      "baseline_Pearson": 0.6644,
+      "baseline_L1": 0.1505,
+      "delta": {
+        "FID": 1.35,
+        "LPIPS": -0.0096,
+        "SSIM": 0.0133,
+        "PSNR": -0.18,
+        "L1": 0.0015,
+        "Pearson": 0.001
+      },
+      "verdict": "mixed: LPIPS/SSIM better, FID/L1/PSNR slightly worse; colour/grad not a clear win",
+      "json": "docs/metrics_stage25_reverse_best_val50_local_fid.json"
+    }
+  },
   "kaggle": {
-    "checked_utc": "2026-10-22T17:22:00Z",
-    "dapi_job": "baseline_complete",
-    "reason": "512 pretrain + 1024 fine-tune + full 630/945 eval complete",
-    "gpu_remaining_hours": 7.72,
+    "checked_utc": "2026-10-24T03:10:00Z",
+    "dapi_job": "stage25b_forward_running; stage25_eval_running",
+    "reason": "R-007 completed 12:13 UTC (10/10 epochs, exit 0) but has no valid FID/LPIPS and a Tanh/[0,1] mismatch; paired U-Net selected; no more CycleGAN GPU spend",
+    "gpu_remaining_hours": "fresh weekly quota after 2026-10-24T00:00:00Z reset (expect ~30h)",
     "quota_refresh": "2026-10-24T00:00:00",
     "old_kernels": [
       "bikasash/he-dapi-product-gpu-train",
@@ -288,17 +518,18 @@
       }
     },
     "channel_audit": {
-      "status": "BLOCKER",
+      "status": "RESOLVED",
       "dapi_channel": 2,
       "panck_channel": 0,
       "cd3_channel": 1,
       "doc": "docs/CHANNEL_AUDIT.md"
     },
     "corrected_ch2_run": {
-      "status": "running",
+      "status": "complete_valid_undertrained",
       "kernel": "bikasash/he-dapi-paired-ch2-1024-both",
       "version": 1,
       "pushed_utc": "2026-10-23T04:54:00Z",
+      "completed_utc": "2026-10-23T08:55:00Z",
       "direction": "both",
       "stage": "all",
       "pretrain_epochs": 14,
@@ -307,7 +538,400 @@
       "data": "bikasash/hemit-dapi-1024-ch0-macenko (mihc intact; loader ch2)",
       "code_dataset": "bikasash/he-dapi-code-dapi-1024 v2026-10-23 04:53",
       "quota_remaining_hours_at_launch": 6.18,
-      "stop_rule": "cancel if a direction exceeds ~2.4h before fine-tune"
+      "quota_remaining_hours_after": 2.67,
+      "output": "/home/bikash/kaggle_ch2_output",
+      "log": "/home/bikash/kaggle_ch2_output/he-dapi-paired-ch2-1024-both.log",
+      "note": "First output pull filled /tmp (1.9GB tmpfs); re-pulled checkpoints and log to /home. Both directions exit 0; target verified mihc[...,2]. DISTS disabled by use_dists logic bug."
+    },
+    "r007_result": {
+      "status": "complete_invalid",
+      "exit_code": 0,
+      "completed_utc": "2026-10-23T12:13:00Z",
+      "eval_json": "/home/bikash/kaggle_r007_output/checkpoints/hemit_cyclegan_ch2_256/eval_cyclegan.json",
+      "FID": null,
+      "LPIPS": null,
+      "note": "kernel omitted --metrics fid,lpips; raw metrics invalid due Tanh/[0,1] mismatch"
+    },
+    "stage25_eval": {
+      "kernel": "bikasash/he-dapi-paired-stage25-eval",
+      "status": "running",
+      "scope": "val 630 + FID/LPIPS 50; test skipped"
+    },
+    "stage25b_forward": {
+      "kernel": "bikasash/he-dapi-paired-stage25b-forward",
+      "status": "running",
+      "epochs": 20,
+      "expected_hours": 10.0
     }
+  },
+  "host_safety": {
+    "checked_utc": "2026-10-24T03:06:27Z",
+    "status": "GREEN",
+    "c_free_mb": 12884,
+    "incident_utc": "2026-10-23T09:30:01Z",
+    "cause": "Windows C: full; WSL ext4.vhdx cannot grow; ENOSPC/0-byte artifact and host-side VM termination",
+    "guard": "scripts/crash_guard.sh",
+    "guard_cron": "@reboot --boot-check; */5 --sample",
+    "preflight": "SAFE (C: 12884MB >= 8192MB, SwapFree 1023MB; 1 known 0-byte warning)",
+    "hard_rule": "no training launch and no Kaggle output pull until --preflight exits 0",
+    "resolution_utc": "2026-10-23T10:37:00Z",
+    "reclaimed_gb": {
+      "wsl": 53.1,
+      "windows": 5.2
+    },
+    "c_free_note": "Snapshot 12071MB at 10:37 UTC; Windows pagefile resizing moved free space between ~5.3 and 12GB. Monitor preflight-gates auto-pull.",
+    "reboot_utc": "2026-10-24T02:50:00Z",
+    "reboot_note": "Host reboot; no checkpoint loss; preflight SAFE after boot"
+  },
+  "r007": {
+    "status": "complete_invalid_for_selection",
+    "stage": "2.3 fair unpaired comparison",
+    "kernel": "bikasash/he-dapi-cyclegan-ch2-256-r-007",
+    "staging_dir": "/home/bikash/kaggle_stage/he-dapi-cyclegan-ch2-256",
+    "code_dataset": "bikasash/he-dapi-code-dapi-1024 (2026-10-23 04:53, ADR-014)",
+    "data_dataset": "bikasash/hemit-dapi-1024-ch0-macenko (mihc intact; cropped in-kernel)",
+    "plan": "256 crop, 10 epochs, batch 4 x accum 2, AMP, eval 630 val, <=1.5 GPU-h",
+    "gpu_remaining_hours": 1.1,
+    "reference": {
+      "label": "dapi2he_ch2_1024 @256 val50",
+      "FID": 285.29,
+      "LPIPS": 0.5129,
+      "PSNR": 15.45,
+      "SSIM": 0.4772,
+      "L1": 0.1548,
+      "json": "docs/metrics_ch2_1024_reverse_256_val50.json"
+    },
+    "supersedes_invalid_reference": {
+      "FID": 342.98,
+      "LPIPS": 0.5904,
+      "note": "ch0 panCK; do not use"
+    },
+    "stop_rules": [
+      "missing [CH2] verified line",
+      "HE files > 0 or synthetic=True",
+      "no epoch progress in 20 min",
+      "OOM/CUDA failure"
+    ],
+    "metadata_kernel_id": "bikasash/he-dapi-cyclegan-ch2-256",
+    "version": 1,
+    "launched_utc": "2026-10-23T10:38:00Z",
+    "monitor": "logs/kaggle_r007_monitor.sh",
+    "monitor_log": "logs/kaggle_r007_monitor.log",
+    "output": "/home/bikash/kaggle_r007_output",
+    "target_verified_utc": "2026-10-23T10:54:00Z",
+    "training_started_utc": "2026-10-23T10:55:00Z",
+    "live_log": "logs/kaggle_r007_live.log",
+    "note": "Target and H5-only provenance were valid; failure is eval/activation/undertraining, not channel contamination.",
+    "completed_utc": "2026-10-23T12:13:00Z",
+    "exit_code": 0,
+    "epochs_completed": 10,
+    "epoch_seconds": "416-430",
+    "eval_json": "/home/bikash/kaggle_r007_output/checkpoints/hemit_cyclegan_ch2_256/eval_cyclegan.json",
+    "eval_metrics_raw": {
+      "L1": 0.3449,
+      "PSNR": 8.45,
+      "SSIM": 0.2215,
+      "Pearson": -0.2984,
+      "FID": null,
+      "LPIPS": null,
+      "metric_n": 50
+    },
+    "eval_invalid_reason": "kernel omitted --metrics fid,lpips; Tanh output [-1,1] compared with [0,1] targets; 10-epoch undertrained",
+    "spot_check_denorm": {
+      "crops": 5,
+      "PSNR": 12.25,
+      "SSIM": 0.3698,
+      "Pearson": -0.2975
+    },
+    "checkpoint_sha256": {
+      "cyclegan_G_last.pt": "815023a0b1d355993e79d970764dd266b65c72a23e36753ccced04102f9e4857",
+      "generator_last.pt": "d5ef563e4187492bcb3db523e0122aea599082cd0a22059169d0e5f16f39956f"
+    },
+    "output_pull": "filtered 91MB; full pull would have been ten 289MB epoch checkpoints",
+    "verdict": "invalid for selection; paired U-Net remains default; no more CycleGAN GPU spend",
+    "code_fixes": [
+      "ResnetGenerator final activation Sigmoid",
+      "kernel eval passes --metrics fid,lpips",
+      "backend reverse uses dapi2he_ch2_1024/generator_last.pt"
+    ]
+  },
+  "stage25b": {
+    "status": "complete_20ep",
+    "direction": "he2dapi",
+    "launched_utc": "2026-10-24T03:10:00Z",
+    "kernel": "bikasash/he-dapi-paired-stage25b-forward",
+    "kernel_status": "COMPLETE",
+    "datasets": [
+      "bikasash/he-dapi-code-stage25 (2026-10-24 03:05)",
+      "bikasash/he-dapi-he2dapi-legacy512-seed",
+      "bikasash/hemit-dapi-1024-ch0-macenko"
+    ],
+    "seed": "resources/models/checkpoints/he2dapi/checkpoint_epoch200.pt",
+    "seed_sha256": "6789d7d244cc6ac93dffd98a30ed2c17498aa7ee6081560dedac5173b44042aa",
+    "config": "configs/hemit_dapi_quality_1024.yaml",
+    "epochs": 20,
+    "batch_size": 1,
+    "grad_accum": 8,
+    "lr": 3e-05,
+    "loss_weights": {
+      "gan": 1.0,
+      "l1": 50.0,
+      "ssim": 10.0,
+      "nuclei": 2.0,
+      "color": 0.0,
+      "grad": 0.0,
+      "dists": 0.0
+    },
+    "val": {
+      "h5": "data/processed/hemit_val_1024.h5",
+      "num": 50,
+      "every": 1,
+      "score": "val_L1 + 0.25*(1-val_SSIM_skimage)"
+    },
+    "staging": "/home/bikash/kaggle_stage/stage25b_forward",
+    "output_dir": "/kaggle/working/checkpoints/dapi_quality",
+    "expected_hours": 10.0,
+    "hypothesis": "long paper-aligned 1024 fine-tune from legacy 512 epoch-200 beats legacy (FID 146.27/LPIPS 0.2468) and 1024 ch2 baseline (215.38/0.3899)",
+    "why_not_stage25_recipe": "2026-10-22 forward quality (color 5/grad 2) was negative: FID 77.14->89.32, SSIM 0.728->0.664",
+    "gate": "PASS vs 1024 ch2 baseline on every metric; FAIL vs legacy 512 on FID/LPIPS/PSNR/L1; PASS vs legacy on SSIM/Pearson/Dice. Cross-resolution caveat: legacy is 512, new is 1024.",
+    "completed_utc": "2026-10-24T13:12:00Z",
+    "epochs_completed": 20,
+    "best_epoch": 17,
+    "best_val": {
+      "L1": 0.0237,
+      "SSIM": 0.7771,
+      "PSNR": 28.86,
+      "Pearson": 0.5851,
+      "Dice": 0.2018,
+      "score": 0.0794,
+      "n": 50
+    },
+    "eval_local": {
+      "FID": 169.53,
+      "LPIPS": 0.2706,
+      "L1": 0.0237,
+      "SSIM": 0.7771,
+      "PSNR": 28.86,
+      "Pearson": 0.5851,
+      "Dice": 0.2018,
+      "D_loss": 0.7544,
+      "n": 50,
+      "json": "docs/metrics_stage25b_forward_best_val50_local.json"
+    },
+    "baseline_1024": {
+      "FID": 215.38,
+      "LPIPS": 0.3899,
+      "L1": 0.025,
+      "SSIM": 0.7733,
+      "PSNR": 27.91,
+      "Pearson": 0.5515,
+      "Dice": 0.0828
+    },
+    "legacy_512": {
+      "FID": 146.27,
+      "LPIPS": 0.2468,
+      "L1": 0.0221,
+      "SSIM": 0.7662,
+      "PSNR": 29.52,
+      "Pearson": 0.5323,
+      "Dice": 0.1638,
+      "resolution": 512
+    },
+    "delta_vs_1024": {
+      "FID": -45.85,
+      "LPIPS": -0.1193,
+      "L1": -0.0013,
+      "SSIM": 0.0038,
+      "PSNR": 0.95,
+      "Pearson": 0.0336,
+      "Dice": 0.119
+    },
+    "output_pulled": "/home/bikash/kaggle_out_stage25b_forward",
+    "output_pulled_utc": "2026-10-24T13:47:00Z",
+    "checkpoint_sha256": {
+      "best": "3850b8ba4f6543c3a2e76f125ca5f33164777edc31a6decbe6cee8c300523f72",
+      "last": "764acef946ccac7d6d3568ce22a9f8125a4cd4825d6acf67cd3b7b62351f2471",
+      "generator_best": "62916baed68b2f6244d0a80ab2ff397e30800e9ed3c228485ad1ff0a377d478b"
+    },
+    "verdict": "best 1024 forward model; legacy 512 remains the perceptual/FID best; use 1024 for high-res/nuclei work, legacy as default until a 1024 model beats 146.27/0.2468 at 1024",
+    "forward_comparison_1024": {
+      "legacy_512_at_1024": {
+        "FID": 129.99,
+        "LPIPS": 0.2977,
+        "PSNR": 28.25,
+        "SSIM": 0.6562,
+        "Pearson": 0.5846,
+        "L1": 0.0289,
+        "Dice": 0.4315,
+        "n": 50,
+        "json": "docs/metrics_legacy512_at1024_val50_local.json"
+      },
+      "stage25b_forward": {
+        "FID": 169.53,
+        "LPIPS": 0.2706,
+        "PSNR": 28.86,
+        "SSIM": 0.7771,
+        "Pearson": 0.5851,
+        "L1": 0.0237,
+        "Dice": 0.2018,
+        "n": 50
+      },
+      "verdict": "at 1024, legacy wins FID (129.99 vs 169.53) and Dice (0.4315 vs 0.2018); Stage 2.5b wins LPIPS/PSNR/SSIM/L1. Legacy remains forward default; fine-tune traded nuclei accuracy for pixel fidelity."
+    }
+  },
+  "stage25b_reverse": {
+    "status": "complete_20ep",
+    "direction": "dapi2he",
+    "launched_utc": "2026-10-24T03:56:00Z",
+    "kernel": "bikasash/he-dapi-paired-stage25b-reverse",
+    "kernel_status": "COMPLETE",
+    "datasets": [
+      "bikasash/he-dapi-code-stage25 (2026-10-24 03:22)",
+      "bikasash/he-dapi-dapi2he-ch2-1024-seed",
+      "bikasash/hemit-dapi-1024-ch0-macenko"
+    ],
+    "seed": "resources/models/checkpoints/dapi2he_ch2_1024/checkpoint_last.pt",
+    "seed_sha256": "5f930960c6fd5a0adb3beb40e1a4d1d1d239e24908b7d38c2012af8cba870f98",
+    "config": "configs/hemit_dapi2he_1024_long.yaml",
+    "epochs": 20,
+    "batch_size": 1,
+    "grad_accum": 8,
+    "lr": 3e-05,
+    "loss_weights": {
+      "gan": 1.0,
+      "l1": 50.0,
+      "ssim": 10.0,
+      "nuclei": 0.0,
+      "color": 0.0,
+      "grad": 0.0,
+      "dists": 0.0
+    },
+    "val": {
+      "h5": "data/processed/hemit_val_1024.h5",
+      "num": 50,
+      "every": 1,
+      "score": "val_L1 + 0.25*(1-val_SSIM_skimage)"
+    },
+    "staging": "/home/bikash/kaggle_stage/stage25b_reverse",
+    "output_dir": "/kaggle/working/checkpoints/dapi2he_quality",
+    "expected_hours": 10.0,
+    "hypothesis": "clean long 1024 reverse control from the 2-epoch baseline; isolate training duration from the colour/grad recipe",
+    "gate": "PASS vs 1024 baseline and Stage 2.5 on every metric; FAIL vs paper target (SSIM 0.785 / PSNR 28.3)",
+    "completed_utc": "2026-10-24T14:48:00Z",
+    "epochs_completed": 20,
+    "best_epoch": 20,
+    "best_val": {
+      "L1": 0.1447,
+      "SSIM": 0.5181,
+      "PSNR": 15.84,
+      "Pearson": 0.6919,
+      "score": 0.2651,
+      "n": 50
+    },
+    "eval_local": {
+      "FID": 239.18,
+      "LPIPS": 0.4875,
+      "L1": 0.1447,
+      "SSIM": 0.5181,
+      "PSNR": 15.84,
+      "Pearson": 0.6919,
+      "D_loss": 0.755,
+      "n": 50,
+      "json": "docs/metrics_stage25b_reverse_best_val50_local.json"
+    },
+    "baseline_1024": {
+      "FID": 282.92,
+      "LPIPS": 0.5317,
+      "L1": 0.1505,
+      "SSIM": 0.4891,
+      "PSNR": 15.42,
+      "Pearson": 0.6644
+    },
+    "stage25": {
+      "FID": 284.27,
+      "LPIPS": 0.5221,
+      "L1": 0.152,
+      "SSIM": 0.5024,
+      "PSNR": 15.24,
+      "Pearson": 0.6654
+    },
+    "delta_vs_baseline": {
+      "FID": -43.74,
+      "LPIPS": -0.0442,
+      "L1": -0.0058,
+      "SSIM": 0.029,
+      "PSNR": 0.42,
+      "Pearson": 0.0275
+    },
+    "delta_vs_stage25": {
+      "FID": -45.09,
+      "LPIPS": -0.0346,
+      "L1": -0.0073,
+      "SSIM": 0.0157,
+      "PSNR": 0.6,
+      "Pearson": 0.0265
+    },
+    "output_pulled": "/home/bikash/kaggle_out_stage25b_reverse",
+    "output_pulled_utc": "2026-10-25T04:42:00Z",
+    "checkpoint_sha256": {
+      "best": "652438e1906a61994c1af8db5e8f0932b91184f2722deacdf1c751fd360fd108",
+      "last": "7dd4faf87f2ab25b4fe87671ca742345ca123ee6f8544e1c6ab40ae1a069ae2a",
+      "generator_best": "8d275c83bef894f431ade2c149dc43473c6dd9d2548c2eb4b1268a7f7dff802c"
+    },
+    "verdict": "clean long recipe beats colour/grad Stage 2.5 on every metric; best is the final epoch -> longer clean training is the next lever"
+  },
+  "stage25b_reverse_ext": {
+    "status": "COMPLETE_EVALUATED",
+    "kernel": "bikasash/he-dapi-paired-stage25b-reverse-ext",
+    "seed_dataset": "bikasash/he-dapi-dapi2he-stage25b-best-seed",
+    "seed_sha256": "652438e1906a61994c1af8db5e8f0932b91184f2722deacdf1c751fd360fd108",
+    "seed_epoch": 20,
+    "epochs": "21-30 (10 more)",
+    "config": "configs/hemit_dapi2he_1024_long.yaml",
+    "started_utc": "2026-10-26T04:08:39Z",
+    "monitor_pid": 46882,
+    "monitor_log": "logs/kaggle_stage25b_reverse_ext_monitor.log",
+    "local_pull": "/home/bikash/kaggle_out_stage25b_reverse_ext",
+    "confirmed_resume": true,
+    "latest_epoch": 30,
+    "latest_val": {
+      "L1": 0.1443,
+      "SSIM": 0.4889,
+      "PSNR": 15.83,
+      "score": 0.2721,
+      "n": 50
+    },
+    "best_so_far": "epoch 22 (score 0.2622); no improvement in epochs 23-30",
+    "completed_utc": "2026-10-26T09:53:15Z",
+    "best_epoch": 22,
+    "best_val": {
+      "L1": 0.1393,
+      "SSIM": 0.5082,
+      "PSNR": 15.93,
+      "score": 0.2622,
+      "n": 50
+    },
+    "final_epoch": 30,
+    "final_val": {
+      "L1": 0.1443,
+      "SSIM": 0.4889,
+      "PSNR": 15.83,
+      "score": 0.2721,
+      "n": 50
+    },
+    "pull_status": "DONE",
+    "local_eval": {
+      "FID": 250.35,
+      "LPIPS": 0.4929,
+      "PSNR": 15.93,
+      "SSIM": 0.5082,
+      "Pearson": 0.6882,
+      "L1": 0.1393,
+      "n": 50,
+      "json": "docs/metrics_stage25b_reverse_ext_best_val50_local.json"
+    },
+    "verdict": "mixed/diminishing returns: epoch 22 wins composite (0.2622), L1, PSNR; seed epoch 20 wins FID 239.18, LPIPS 0.4875, SSIM 0.5181, Pearson 0.6919. Keep epoch 20 as perceptual reverse default.",
+    "best_perceptual": "epoch 20 (seed)",
+    "best_composite": "epoch 22"
   }
 }
