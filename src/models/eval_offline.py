@@ -97,7 +97,9 @@ def evaluate(checkpoint_path: str, split: str = "val", num: int = 30,
     )
     loader = DataLoader(ds, batch_size=1, shuffle=False, num_workers=0)
     ssim_fn = SSIMLoss()
-    dice_fn = NucleiDiceLoss(thresh=0.1)  # fixed 2026-10-03 (0.5 was vacuous)
+    # Keep the reported metric comparable across runs: training uses a soft
+    # threshold for gradients, but eval Dice is the original hard-threshold Dice.
+    dice_fn = NucleiDiceLoss(thresh=0.1, soft=False)
     l1_fn = nn.L1Loss()
     mse_fn = nn.MSELoss()
     bce = nn.BCEWithLogitsLoss()

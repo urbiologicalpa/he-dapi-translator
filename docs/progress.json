@@ -1,7 +1,7 @@
 {
   "project": "he-dapi-translator",
-  "updated": "2026-10-25T04:50:00Z",
-  "status": "STAGE25B_REVERSE_EXT_COMPLETE_EVALUATED; REVERSE_DIMINISHING_RETURNS",
+  "updated": "2026-10-27T13:44:00Z",
+  "status": "STAGE25C_FORWARD_SOFT_DICE_RUNNING; REVERSE_DIMINISHING_RETURNS",
   "overall_percent": 56,
   "machine": {
     "cpu": "Intel i5-10210U 8vCPU 4c/8t",
@@ -9,11 +9,11 @@
     "swap_gb": 1.0,
     "gpu": null,
     "kaggle_gpu": "2x Tesla T4 15.64GB (verified 2026-10-20)",
-    "disk_free_gb": 9.9,
+    "disk_free_gb": 34.0,
     "budget_per_process_gb": 1.5,
     "spike_threshold_mb": 500,
     "wsi_canvas_budget_mb": 512,
-    "disk_note": "Windows C: 9898MB free at 12:41 UTC; fluctuates ~5-12GB as the Windows pagefile resizes. Preflight gates launches/pulls at 8192MB.",
+    "disk_note": "Windows C: 34002MB free at 2026-10-27 13:44 UTC; preflight SAFE. Preflight gates launches/pulls at 8192MB.",
     "ext4_vhdx_gb": 155.4,
     "ext4_vhdx_note": "155.4GiB logical; the vhdx file still reports ~156GB allocated and has not been compacted. Deleting inside WSL does not shrink it; compaction needs a Windows shutdown + diskpart/Optimize-VHD."
   },
@@ -199,8 +199,9 @@
     }
   ],
   "next_actions": [
+    "Forward Stage 2.5c soft-Dice probe RUNNING: evaluate hard Dice/FID/LPIPS after 4 epochs; require Dice > 0.2018 without material L1/SSIM collapse before extending",
     "Reverse: stop extending; keep epoch 20 as perceptual default (FID/LPIPS/SSIM/Pearson) and epoch 22 as L1/PSNR alternative",
-    "Forward: legacy 512 remains default (best FID 129.99 + Dice 0.4315 at 1024); next forward work must preserve Dice (stronger nuclei loss / from-scratch 1024), not another L1/SSIM fine-tune",
+    "Forward: legacy 512 remains default (best FID 129.99 + Dice 0.4315 at 1024) until the Dice probe passes",
     "Run full val 630 + test 945 with bootstrap CIs on the selected forward/reverse checkpoints",
     "Upload hemit_test_1024.h5 to Kaggle before the release test gate",
     "Pathologist qualitative review of reverse outputs (SSIM ~0.51 / PSNR ~15.9 is still weak)",
@@ -296,6 +297,10 @@
     {
       "date": "2026-10-26",
       "note": "Reverse extension local eval: FID 250.35 / LPIPS 0.4929 / PSNR 15.93 / SSIM 0.5082 / L1 0.1393. Mixed: epoch 22 wins composite/L1/PSNR, but seed epoch 20 still wins FID/LPIPS/SSIM/Pearson. Stop extending reverse. Freed 33GB on C: by clearing Windows Update/temp/CBS/crash caches; no training data touched."
+    },
+    {
+      "date": "2026-10-27",
+      "note": "Resumed the quota-interrupted forward Dice work. Fixed NucleiDiceLoss with a differentiable soft prediction mask, retained hard-threshold Dice for comparable eval, and added regression tests (48 passed, 3 deselected). Uploaded code bundle SHA 53c273e5... and launched bikasash/he-dapi-paired-stage25c-forward-dice v1 at 13:44 UTC (4 epochs, soft Dice weight 10); RUNNING with correct config/seed confirmed. Monitor PID 9831; preflight SAFE, C: 34.0GB."
     }
   ],
   "stage25": {
@@ -933,5 +938,37 @@
     "verdict": "mixed/diminishing returns: epoch 22 wins composite (0.2622), L1, PSNR; seed epoch 20 wins FID 239.18, LPIPS 0.4875, SSIM 0.5181, Pearson 0.6919. Keep epoch 20 as perceptual reverse default.",
     "best_perceptual": "epoch 20 (seed)",
     "best_composite": "epoch 22"
+  },
+  "stage25c_forward_dice": {
+    "status": "RUNNING",
+    "kernel": "bikasash/he-dapi-paired-stage25c-forward-dice",
+    "kernel_version": 1,
+    "launched_utc": "2026-10-27T13:44:00Z",
+    "direction": "he2dapi",
+    "seed": "bikasash/he-dapi-he2dapi-legacy512-seed",
+    "seed_sha256": "6789d7d244cc6ac93dffd98a30ed2c17498aa7ee6081560dedac5173b44042aa",
+    "config": "configs/hemit_dapi_quality_1024_dice.yaml",
+    "config_sha256": "5edd8bb8823825be56ce8f655c1f3a1b94aee46b43d84e46fc26775cd486b2cf",
+    "code_bundle_sha256": "53c273e544840ebbc1e8a49a3cbee79fc1ef08b15e38831715f71150d4c2dacd",
+    "epochs": 4,
+    "loss_weights": {
+      "gan": 1.0,
+      "l1": 50.0,
+      "ssim": 10.0,
+      "nuclei_soft_dice": 10.0,
+      "color": 0.0,
+      "grad": 0.0,
+      "dists": 0.0
+    },
+    "nuclei_threshold": 0.1,
+    "nuclei_temperature": 0.05,
+    "eval_dice": "hard threshold (soft=False), comparable with earlier runs",
+    "staging": "/home/bikash/kaggle_stage/stage25c_forward_dice",
+    "local_pull": "/home/bikash/kaggle_out_stage25c_forward_dice",
+    "monitor_pid": 9831,
+    "monitor_log": "logs/kaggle_stage25c_forward_dice_monitor.log",
+    "tests": "48 passed, 3 deselected",
+    "preflight": "SAFE; C: 34002MB; SwapFree 1024MB",
+    "gate": "hard Dice > Stage 2.5b 0.2018 without material L1/SSIM collapse; then FID/LPIPS and full-split validation"
   }
 }

@@ -1,4 +1,4 @@
-# Progress tracker — 2026-10-25
+# Progress tracker — 2026-10-27
 
 > **Canonical plan: [`docs/PLAN.md`](PLAN.md) v2.0.** Live run and recovery:
 > [`docs/LIVE_STATE.md`](LIVE_STATE.md). This file is the short status only.
@@ -35,7 +35,8 @@ forward (legacy 512 seed) and reverse (clean control) both completed 20-epoch
 | Stage 2.5 paired reverse 1024 | **COMPLETE ~15:00 UTC 2026-10-23; eval local** | `bikasash/he-dapi-paired-stage25-reverse` v1; 4/4 epochs, exit 0; output pulled (518 MB); best == last == epoch 4. Kaggle eval cancelled after hanging on FID/LPIPS download; local n=50 eval: FID 284.27 / LPIPS 0.5221 / SSIM 0.5024 / PSNR 15.24. |
 | Stage 2.5b paired forward 1024 | **COMPLETE 13:12 UTC 2026-10-24** | `bikasash/he-dapi-paired-stage25b-forward`; 20/20 epochs, exit 0; best epoch 17. Val L1 0.0237 / SSIM 0.7771 / PSNR 28.86 / Pearson 0.5851 / Dice 0.2018; local FID 169.53 / LPIPS 0.2706. Beats the 1024 baseline everywhere, not legacy 512 on FID/LPIPS. |
 | Stage 2.5b paired reverse 1024 | **COMPLETE 14:48 UTC 2026-10-24** | `bikasash/he-dapi-paired-stage25b-reverse`; 20/20 epochs, exit 0; best epoch 20. Val L1 0.1447 / SSIM 0.5181 / PSNR 15.84 / Pearson 0.6919; local FID 239.18 / LPIPS 0.4875. Beats the 1024 baseline and Stage 2.5 on every metric. |
-| Host safety | **GREEN** | `C:` ~8.8 GB free; preflight `SAFE` at 2026-10-25 04:42 UTC. |
+| Stage 2.5c forward soft-Dice probe | **RUNNING 2026-10-27 13:45 UTC** | `bikasash/he-dapi-paired-stage25c-forward-dice`; 4 epochs from legacy epoch 200; differentiable Dice weight 10. Live log confirms correct ch2 config/seed; monitor PID 9831. |
+| Host safety | **GREEN** | `C:` ~34.0 GB free; preflight `SAFE` at 2026-10-27 13:44 UTC; known optional zero-byte snapshot only. |
 | CycleGAN MHIST H&E | **Complete, negative/confounded** | FID 362.34 vs paired 342.98; target domain differed. |
 | CycleGAN HEMIT (14:25) | **INVALID — cancelled** | `CANCEL_ACKNOWLEDGED`; stale code bundle mixed `data/examples`; do not use metrics. |
 | CycleGAN HEMIT 256 (R-006) | **COMPLETE — panCK ch0; invalid for DAPI** | 10 epochs, exit 0; val-50 FID 367.97, LPIPS 0.5948, SSIM 0.2216; do not cite as DAPI. |
@@ -47,7 +48,7 @@ forward (legacy 512 seed) and reverse (clean control) both completed 20-epoch
 |---|---|---|
 | 0. Truth & infra | **DONE** | CI, Docker, guards, channel regression tests. |
 | 1. Data contract | **DONE** | Corrected 1024 + derived 256 H5; no leakage; H5 authoritative. |
-| 2. Model baselines | **PAIRED SELECTED; 2.5 DONE; 2.5b RUNNING** | Valid forward/reverse `ch2` 1024 baselines exist but are undertrained; R-007 unpaired invalid; Stage 2.5 reverse complete and locally evaluated; Stage 2.5b forward + reverse long runs launched 03:10/03:56 UTC. |
+| 2. Model baselines | **PAIRED SELECTED; 2.5/2.5b DONE; 2.5c RUNNING** | Reverse extension stopped on diminishing returns; legacy 512 remains forward default. Stage 2.5c is a 4-epoch differentiable-Dice probe to recover nuclei accuracy. |
 | 3. Validation | **PARTIAL** | 50-crop ch2 metrics exist; selection memo closed (paired); full 630/945 val/test and CIs pending. |
 | 4. Product integration | **ALPHA** | Router/API/UI/ONNX exist; legacy 512 DAPI weights verified (H5 ch2 + HF SHA match); demo/API SHA manifest pending. |
 | 5. Release | **ALPHA** | Frozen; no promotion until the corrected `ch2` baseline passes full-split/CIs and the reverse model is release quality. |
@@ -87,7 +88,10 @@ R-007 is invalid for selection; the 1024 `ch0` models and R-006 are panCK.
     0.4875 / SSIM 0.5181 / Pearson 0.6919. **Stop extending reverse;** keep
     epoch 20 as perceptual default, epoch 22 as L1/PSNR alternative. Output
     pulled and evaluated. Forward needs a Dice-preserving objective.
-12. Then full 630/945 val/test + bootstrap CIs on the selected checkpoints, and
+12. **Stage 2.5c forward soft-Dice probe running** (2026-10-27 13:44 UTC).
+    Four epochs, seed legacy epoch 200, soft Dice weight 10. Gate: hard Dice
+    recovers above 0.2018 without material L1/SSIM collapse; then FID/LPIPS.
+13. Then full 630/945 val/test + bootstrap CIs on the selected checkpoints, and
     align the public/API/Docker checkpoint SHA before v0.2.0 (HF epoch169 vs
     API epoch200); ask before publishing.
 

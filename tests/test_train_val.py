@@ -10,6 +10,7 @@ class TinyGenerator(nn.Module):
 
 
 def test_validate_reports_metrics():
+    torch.manual_seed(0)
     loader = [{
         "he": torch.rand(1, 3, 16, 16) * 2 - 1,
         "dapi": torch.rand(1, 1, 16, 16),

@@ -70,19 +70,24 @@ class DISTSLoss(nn.Module):
 
 class NucleiDiceLoss(nn.Module):
     """
-    Auxiliary nuclei segmentation loss: runs pretrained StarDist/Cellpose features?
-    Simplified: threshold DAPI at thresh -> binary mask, compute Dice between real vs fake DAPI.
-    NOTE 2026-10-03: thresh was 0.5 but HEMIT DAPI in [0,1] has mean 0.02-0.05 max ~0.3,
-    so 0.5 gave empty masks -> vacuous Dice=1.0. Fixed default to 0.1 (covers nuclei peaks).
+    Auxiliary nuclei segmentation loss: threshold DAPI at thresh -> binary mask,
+    compute Dice between real vs fake DAPI.
+
+    The prediction mask uses a soft threshold (sigmoid) so the loss is
+    differentiable. The previous hard ``> thresh`` mask had zero gradient almost
+    everywhere, so ``nuclei_aux_weight`` could not preserve nuclei Dice.
     """
-    def __init__(self, thresh=0.1, smooth=1e-5):
+    def __init__(self, thresh=0.1, smooth=1e-5, temperature=0.05, soft=True):
         super().__init__()
         self.thresh = thresh
         self.smooth = smooth
+        self.temperature = temperature
+        self.soft = soft
 
     def forward(self, fake_dapi, real_dapi):
         # fake/real: Bx1xHxW in [0,1]
-        pred_mask = (fake_dapi > self.thresh).float()
+        pred_mask = (torch.sigmoid((fake_dapi - self.thresh) / self.temperature)
+                     if self.soft else (fake_dapi > self.thresh).float())
         true_mask = (real_dapi > self.thresh).float()
         intersection = (pred_mask * true_mask).sum(dim=(1,2,3))
         union = pred_mask.sum(dim=(1,2,3)) + true_mask.sum(dim=(1,2,3))

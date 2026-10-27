@@ -398,7 +398,10 @@ def main():
     losses = {
         "ssim": SSIMLoss(),
         "dists": DISTSLoss() if use_dists else None,
-        "nuclei": NucleiDiceLoss() if use_nuclei else None,
+        "nuclei": NucleiDiceLoss(
+            thresh=float(loss_cfg.get("nuclei_thresh", 0.1)),
+            temperature=float(loss_cfg.get("nuclei_temp", 0.05)),
+        ) if use_nuclei else None,
         "color": ColorStatsLoss() if use_color else None,
         "grad": GradientLoss() if use_grad else None,
     }

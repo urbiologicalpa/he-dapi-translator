@@ -368,33 +368,31 @@ model on val FID/LPIPS, without colour collapse.
 
 ## 1. Current stage
 
-| Item | State (verified 2026-10-24 03:10 UTC) |
+| Item | State (verified 2026-10-27 13:45 UTC) |
 |---|---|
 | Roadmap phase | **Phase 2 — Modeling** |
-| Sub-stage | **2.5 reverse COMPLETE; 2.5b forward RUNNING (long, 20 ep); 2.5 reverse eval RUNNING** |
-| Primary compute | **Kaggle T4 — `bikasash/he-dapi-paired-stage25b-forward`** |
-| Primary run status | Pushed 2026-10-24 03:10 UTC; per-epoch checkpoints + best selection |
-| **Primary run validity** | Real-SSIM val selection fixed 2026-10-24; test split not attached (val-only gate) |
+| Sub-stage | **2.5/2.5b COMPLETE; 2.5c forward soft-Dice probe RUNNING (4 ep)** |
+| Primary compute | **Kaggle T4 — `bikasash/he-dapi-paired-stage25c-forward-dice`** |
+| Primary run status | Pushed 2026-10-27 13:44 UTC; correct config/seed confirmed in live log |
+| **Primary run validity** | ch2 DAPI; differentiable training Dice, hard eval Dice; val-only probe |
 | Local CPU run | **STOPPED**; WSL protected (see §3) |
-| Host safety | **GREEN — C: 12.9 GB free; preflight SAFE at 03:06 UTC** |
-| Next stage | Eval reverse (running) → eval forward → full 630/945 + CIs on the winner |
+| Host safety | **GREEN — C: 34.0 GB free; preflight SAFE at 13:44 UTC** |
+| Next stage | Evaluate Dice/FID/LPIPS → full 630/945 + CIs on selected checkpoints |
 
 **No release: corrected baselines are undertrained; no model promotion.**
 **Do not restart the local CPU run while swap free is below ~300MB.**
 
 ---
 
-## 2. What is running / not running now (verified 2026-10-24 03:10 UTC)
+## 2. What is running / not running now (verified 2026-10-27 13:45 UTC)
 
 ### Running
-- **Kaggle `bikasash/he-dapi-paired-stage25b-forward`:** pushed 03:10 UTC,
-  long 20-epoch 1024 H&E→DAPI fine-tune from the legacy 512 epoch-200 seed.
-  Writes `/kaggle/working/checkpoints/dapi_quality/checkpoint_epoch*.pt`,
-  `checkpoint_last.pt`, `checkpoint_best.pt`, `generator_*.pt`.
-- **Kaggle `bikasash/he-dapi-paired-stage25-eval`:** pushed at the same time to
-  evaluate the completed Stage 2.5 reverse checkpoints on val 630 with
-  FID/LPIPS. Test is skipped (no `hemit_test_1024.h5` in the attached dataset).
-- **No local training.** No output pull active.
+- **Kaggle `bikasash/he-dapi-paired-stage25c-forward-dice`:** 4-epoch 1024
+  H&E→DAPI soft-Dice probe from the legacy 512 epoch-200 seed. See the latest
+  section at the end of this file for the exact launch/resume contract.
+- **Local monitor PID `9831`:** polls every 5 minutes and performs a filtered
+  output pull only after `crash_guard --preflight` is SAFE.
+- **No local training.** No other Kaggle training/eval run is active.
 
 ### Stage 2.5 / 2.5b status
 - **Stage 2.5 reverse:** COMPLETE (4/4 epochs). Output pulled to
@@ -783,3 +781,49 @@ swap pressure; do not start it on a box with full swap.
 - **Resume:** rerun the same kernel push (seed is fixed), or locally resume
   `checkpoint_best.pt` with `--epochs 30` using the runner args in
   `scripts/kaggle/train_dapi_1024.py`.
+
+## Stage 2.5c forward soft-Dice probe — LAUNCHED 2026-10-27 13:44 UTC
+- **Kernel:** `bikasash/he-dapi-paired-stage25c-forward-dice` (private, T4,
+  internet off); staged at `/home/bikash/kaggle_stage/stage25c_forward_dice/`.
+- **Purpose:** resume the interrupted 2026-10-26 forward work. The old hard
+  threshold made `NucleiDiceLoss` non-differentiable; use soft Dice (weight 10)
+  for 4 epochs instead of spending quota on another L1/SSIM-only fine-tune.
+- **Seed:** `bikasash/he-dapi-he2dapi-legacy512-seed`, legacy epoch 200 SHA-256
+  `6789d7d2…4042aa` (1024 val-50 hard Dice 0.4315; Stage 2.5b dropped to 0.2018).
+- **Data/code:** existing HEMIT train/val H5 dataset (loader reads DAPI
+  `mihc[...,2]`) plus updated `bikasash/he-dapi-code-stage25` bundle.
+  Config `configs/hemit_dapi_quality_1024_dice.yaml`, SHA-256
+  `5edd8bb8823825be56ce8f655c1f3a1b94aee46b43d84e46fc26775cd486b2cf`;
+  bundle `/home/bikash/kaggle_stage/stage25_code/code_bundle.zip`, SHA-256
+  `53c273e544840ebbc1e8a49a3cbee79fc1ef08b15e38831715f71150d4c2dacd`.
+- **Recipe:** 4 epochs, 1024px, batch 1 x grad-accum 8, lr 5e-5, fp32,
+  GAN 1 / L1 50 / SSIM 10 / soft nuclei Dice 10 (threshold 0.1, temp 0.05),
+  colour/grad/DISTS off, fixed 50-crop val every epoch. Expected ~2.3 h.
+- **Validation:** 48 passed, 3 deselected. Eval keeps the historical
+  hard-threshold Dice (`soft=False`) so metrics remain comparable.
+- **Preflight:** SAFE 2026-10-27 13:39 UTC; C: 34.0 GB, SwapFree 1024 MB.
+  Only the known optional zero-byte ch2 epoch-14 snapshot warns; no resume impact.
+- **Launch:**
+  ```bash
+  KAGGLE_API_TOKEN="$(cat ~/.kaggle/api_token)" \
+    .venv/bin/kaggle datasets version -p /home/bikash/kaggle_stage/stage25_code \
+    -m "Stage 2.5c differentiable nuclei Dice probe"
+  KAGGLE_API_TOKEN="$(cat ~/.kaggle/api_token)" \
+    .venv/bin/kaggle kernels push -p /home/bikash/kaggle_stage/stage25c_forward_dice
+  ```
+- **Outputs:** `/kaggle/working/checkpoints/dapi_quality/`; local filtered pull
+  `/home/bikash/kaggle_out_stage25c_forward_dice/` (all 4 epoch checkpoints plus
+  best/last/generators/logs). Monitor script
+  `logs/kaggle_stage25c_forward_dice_monitor.sh`; log
+  `logs/kaggle_stage25c_forward_dice_monitor.log`; monitor PID `9831`.
+- **Launch result:** code dataset uploaded and kernel v1 pushed 13:44 UTC;
+  status `RUNNING` at 13:45 UTC. Live log confirms the Stage 2.5c config,
+  `he2dapi`, legacy seed reset to epoch 0, 4 total epochs, and 50-crop val.
+  Live training log: use `kaggle kernels logs -f` with the standard filtered
+  epoch/val/error command; final log target `logs/kaggle_stage25c_final.log`.
+- **Stop/rules:** stop on OOM, CUDA failure, no epoch progress, or quota stop;
+  per-epoch checkpoints preserve partial work. Resume by attaching the quality
+  output checkpoint as an input dataset and re-pushing with 4 total epochs.
+- **Gate:** hard Dice must recover above Stage 2.5b's 0.2018 without material
+  L1/SSIM collapse before any longer run. Then evaluate FID/LPIPS and proceed to
+  full val 630 + test 945 with bootstrap CIs; no promotion from this probe.
